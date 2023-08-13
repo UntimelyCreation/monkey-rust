@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use crate::lexer::Lexer;
+use crate::{lexer::Lexer, parser::Parser};
 
 const PROMPT: &str = ">> ";
 
@@ -13,10 +13,9 @@ pub fn start_repl() {
         io::stdin().read_line(&mut input).unwrap();
 
         let lexer = Lexer::new(input.as_str());
-        let tokens = lexer.tokenize();
-
-        for token in tokens {
-            println!("{:?}", token);
+        let mut parser = Parser::new(lexer);
+        if let Some(program) = parser.parse_program() {
+            println!("{}", program.to_string());
         }
     }
 }
