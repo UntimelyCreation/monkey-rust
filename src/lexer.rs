@@ -1,16 +1,18 @@
-use crate::token::{match_identifier, Token};
+use std::str::FromStr;
 
-pub struct Lexer<'a> {
-    input: &'a str,
+use crate::token::{match_identifier, Token, TokenType};
+
+pub struct Lexer {
+    input: String,
     position: usize,
     read_position: usize,
     character: char,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Self {
+impl Lexer {
+    pub fn new(input: &str) -> Self {
         let mut lexer = Lexer {
-            input,
+            input: String::from_str(input).unwrap(),
             position: 0,
             read_position: 0,
             character: '\0',
@@ -20,11 +22,11 @@ impl<'a> Lexer<'a> {
         lexer
     }
 
-    pub fn tokenize(mut self) -> Vec<Token<'a>> {
+    pub fn tokenize(mut self) -> Vec<Token> {
         let mut tokens = Vec::new();
 
         let mut token = self.next_token();
-        while token != Token::Eof {
+        while token.kind != TokenType::Eof {
             tokens.push(token);
             token = self.next_token();
         }
@@ -32,7 +34,7 @@ impl<'a> Lexer<'a> {
         tokens
     }
 
-    fn next_token(&mut self) -> Token<'a> {
+    pub fn next_token(&mut self) -> Token {
         let mut skip_read_char = false;
 
         self.skip_whitespace();
@@ -41,32 +43,32 @@ impl<'a> Lexer<'a> {
             '=' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Token::Equal
+                    Token::from_str(TokenType::Equal, "==")
                 } else {
-                    Token::Assign
+                    Token::from_char(TokenType::Assign, self.character)
                 }
             }
-            '+' => Token::Plus,
-            '-' => Token::Minus,
+            '+' => Token::from_char(TokenType::Plus, self.character),
+            '-' => Token::from_char(TokenType::Minus, self.character),
             '!' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Token::NotEqual
+                    Token::from_str(TokenType::NotEqual, "!=")
                 } else {
-                    Token::Bang
+                    Token::from_char(TokenType::Bang, self.character)
                 }
             }
-            '/' => Token::Slash,
-            '*' => Token::Asterisk,
-            '<' => Token::LessThan,
-            '>' => Token::GreaterThan,
-            ',' => Token::Comma,
-            ';' => Token::Semicolon,
-            '(' => Token::LParen,
-            ')' => Token::RParen,
-            '{' => Token::LBrace,
-            '}' => Token::RBrace,
-            '\0' => Token::Eof,
+            '/' => Token::from_char(TokenType::Slash, self.character),
+            '*' => Token::from_char(TokenType::Asterisk, self.character),
+            '<' => Token::from_char(TokenType::LessThan, self.character),
+            '>' => Token::from_char(TokenType::GreaterThan, self.character),
+            ',' => Token::from_char(TokenType::Comma, self.character),
+            ';' => Token::from_char(TokenType::Semicolon, self.character),
+            '(' => Token::from_char(TokenType::LParen, self.character),
+            ')' => Token::from_char(TokenType::RParen, self.character),
+            '{' => Token::from_char(TokenType::LBrace, self.character),
+            '}' => Token::from_char(TokenType::RBrace, self.character),
+            '\0' => Token::from_char(TokenType::Eof, self.character),
             ch if ch.is_ascii_alphabetic() => {
                 let position = self.position;
                 while self.character.is_ascii_alphabetic() {
@@ -81,15 +83,12 @@ impl<'a> Lexer<'a> {
                     self.read_char();
                 }
                 skip_read_char = true;
-                Token::Integer(
-                    self.input
-                        .get(position..self.position)
-                        .unwrap()
-                        .parse()
-                        .unwrap(),
+                Token::from_str(
+                    TokenType::Integer,
+                    self.input.get(position..self.position).unwrap(),
                 )
             }
-            _ => Token::Unknown,
+            _ => Token::from_char(TokenType::Unknown, '\0'),
         };
 
         if !skip_read_char {

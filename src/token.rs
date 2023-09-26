@@ -1,11 +1,35 @@
-#[derive(PartialEq, Debug)]
-pub enum Token<'a> {
+use std::str::FromStr;
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct Token {
+    pub kind: TokenType,
+    pub literal: String,
+}
+
+impl Token {
+    pub fn from_char(kind: TokenType, ch: char) -> Self {
+        Token {
+            kind,
+            literal: String::from(ch),
+        }
+    }
+
+    pub fn from_str(kind: TokenType, literal: &str) -> Self {
+        Token {
+            kind,
+            literal: String::from_str(literal).unwrap(),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Hash)]
+pub enum TokenType {
     Unknown,
     Eof,
 
     // Identifiers
-    Identifier(&'a str),
-    Integer(i32),
+    Identifier,
+    Integer,
 
     // Operators
     Assign,
@@ -42,13 +66,13 @@ pub enum Token<'a> {
 
 pub fn match_identifier(identifier: &str) -> Token {
     match identifier {
-        "let" => Token::Let,
-        "fn" => Token::Function,
-        "true" => Token::True,
-        "false" => Token::False,
-        "if" => Token::If,
-        "else" => Token::Else,
-        "return" => Token::Return,
-        _ => Token::Identifier(identifier),
+        "let" => Token::from_str(TokenType::Let, identifier),
+        "fn" => Token::from_str(TokenType::Function, identifier),
+        "true" => Token::from_str(TokenType::True, identifier),
+        "false" => Token::from_str(TokenType::False, identifier),
+        "if" => Token::from_str(TokenType::If, identifier),
+        "else" => Token::from_str(TokenType::Else, identifier),
+        "return" => Token::from_str(TokenType::Return, identifier),
+        _ => Token::from_str(TokenType::Identifier, identifier),
     }
 }
