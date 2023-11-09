@@ -1,5 +1,7 @@
 mod ast;
+mod evaluator;
 mod lexer;
+mod object;
 mod parser;
 pub mod repl;
 mod token;
@@ -7,13 +9,18 @@ mod token;
 #[warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 #[cfg(test)]
 mod tests {
+    use std::{cell::RefCell, rc::Rc};
+
     use crate::{
         ast::{
-            BlockStatement, BooleanExpression, CallExpression, Expression, ExpressionStatement,
-            FnLiteralExpression, IdentifierExpression, IfExpression, InfixExpression,
-            IntegerExpression, LetStatement, PrefixExpression, ReturnStatement, Statement,
+            AstNode, BlockStatement, BooleanExpression, CallExpression, Expression,
+            ExpressionStatement, FnLiteralExpression, IdentifierExpression, IfExpression,
+            InfixExpression, IntegerExpression, LetStatement, PrefixExpression, ReturnStatement,
+            Statement,
         },
+        evaluator::eval,
         lexer::Lexer,
+        object::{Boolean, Environment, Error, Integer, Object},
         parser::Parser,
         token::{Token, TokenType},
     };
@@ -549,5 +556,255 @@ return x;";
         let parsed_input = parser.parse_program().unwrap();
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
+    }
+
+    #[test]
+    fn test_eval_integer_expressions() {
+        let inputs = [
+            "5",
+            "10",
+            "-5",
+            "-10",
+            "5 + 5 + 5 + 5 - 10",
+            "2 * 2 * 2 * 2 * 2",
+            "5 * 2 + 10",
+            "5 + 2 * 10",
+            "50 / 2 * 2 + 10",
+            "(5 + 10 * 2 + 15 / 3) * 2 + -10",
+        ];
+        let expected_values = [5, 10, -5, -10, 10, 32, 20, 25, 60, 50];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = Object::Integer(Integer {
+                value: expected_values[i],
+            });
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_bool_expressions() {
+        let inputs = [
+            "true",
+            "false",
+            "1 < 2",
+            "1 > 2",
+            "1 < 1",
+            "1 > 1",
+            "1 == 1",
+            "1 != 1",
+            "1 == 2",
+            "1 != 2",
+            "true == true",
+            "true == false",
+            "false == false",
+            "true != false",
+            "false != true",
+        ];
+        let expected_values = [
+            true, false, true, false, false, false, true, false, false, true, true, false, true,
+            true, true,
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = Object::Boolean(Boolean {
+                value: expected_values[i],
+            });
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_prefix_expressions() {
+        let inputs = ["!true", "!false"];
+        let expected_values = [false, true];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = Object::Boolean(Boolean {
+                value: expected_values[i],
+            });
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_if_else_expressions() {
+        let inputs = [
+            "if (true) { 10 }",
+            "if (false) { 10 }",
+            "if (1) { 10 }",
+            "if (1 < 2) { 10 }",
+            "if (1 > 2) { 10 } else { 20 }",
+        ];
+        let expected_values = [
+            Object::Integer(Integer { value: 10 }),
+            Object::Null,
+            Object::Integer(Integer { value: 10 }),
+            Object::Integer(Integer { value: 10 }),
+            Object::Integer(Integer { value: 20 }),
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = expected_values[i].clone();
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_return_expressions() {
+        let inputs = [
+            "return 10;",
+            "return 10; 9;",
+            "return 2 * 5; 9;",
+            "9; return 2 * 5; 9;",
+            "if (10 > 1) { if (10 > 1) { return 10; }} return 1;",
+        ];
+        let expected_values = [10, 10, 10, 10, 10];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = Object::Integer(Integer {
+                value: expected_values[i],
+            });
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_error_handling() {
+        let inputs = [
+            "5 + true;",
+            "5 + true; 5;",
+            "-true",
+            "true * false",
+            "5; true / false; 5",
+            "if (10 > 1) { true + false; }",
+            "foobar",
+        ];
+        let expected_values = [
+            "unknown operator: INTEGER + BOOLEAN",
+            "unknown operator: INTEGER + BOOLEAN",
+            "unknown operator: -BOOLEAN",
+            "unknown operator: BOOLEAN * BOOLEAN",
+            "unknown operator: BOOLEAN / BOOLEAN",
+            "unknown operator: BOOLEAN + BOOLEAN",
+            "identifier not found: foobar",
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = Object::Error(Error {
+                message: expected_values[i].to_string(),
+            });
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_let_statements() {
+        let inputs = [
+            "let a = 5; a;",
+            "let a = 5 * 5; a;",
+            "let a = 5; let b = a; b;",
+            "let a = 5; let b = a; let c = a + b + 5; c;",
+        ];
+        let expected_values = [5, 25, 5, 15];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = Object::Integer(Integer {
+                value: expected_values[i],
+            });
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_function_application() {
+        let inputs = [
+            "let identity = fn(x) { x; }; identity(5);",
+            "let identity = fn(x) { return x; }; identity(5);",
+            "let double = fn(x) { x * 2; }; double(5);",
+            "let add = fn(x, y) { x + y; }; add(5, 5);",
+            "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
+            "fn(x) { x; }(5)",
+        ];
+        let expected_values = [5, 5, 10, 10, 20, 5];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = Object::Integer(Integer {
+                value: expected_values[i],
+            });
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
     }
 }

@@ -1,10 +1,16 @@
-use std::io::{self, Write};
+use std::{
+    cell::RefCell,
+    io::{self, Write},
+    rc::Rc,
+};
 
-use crate::{lexer::Lexer, parser::Parser};
+use crate::{ast::AstNode, evaluator::eval, lexer::Lexer, object::Environment, parser::Parser};
 
 const PROMPT: &str = ">> ";
 
 pub fn start_repl() {
+    let env = Rc::new(RefCell::new(Environment::new()));
+
     loop {
         let mut input = String::new();
 
@@ -15,7 +21,9 @@ pub fn start_repl() {
         let lexer = Lexer::new(input.as_str());
         let mut parser = Parser::new(lexer);
         if let Some(program) = parser.parse_program() {
-            println!("{}", program.to_string());
+            if let Some(evaluated) = eval(AstNode::Program(program), env.clone()) {
+                println!("{}", evaluated.inspect());
+            }
         }
     }
 }
