@@ -20,8 +20,6 @@ cargo test
 
 ### Run the REPL
 
-**NOTE:** The REPL currently only performs lexing and parsing of Monkey code, and outputs a pretty-print version of the Abstract Syntax Tree (AST).
-
 ```bash
 cargo run --release --bin repl
 ```

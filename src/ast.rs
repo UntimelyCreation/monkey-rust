@@ -2,7 +2,25 @@ use std::fmt::Display;
 
 use crate::token::Token;
 
-trait Node {
+pub enum AstNode {
+    Program(Program),
+    Statement(Statement),
+    LetStatement(LetStatement),
+    ReturnStatement(ReturnStatement),
+    ExpressionStatement(ExpressionStatement),
+    BlockStatement(BlockStatement),
+    Expression(Expression),
+    IdentifierExpression(IdentifierExpression),
+    IntegerExpression(IntegerExpression),
+    PrefixExpression(PrefixExpression),
+    InfixExpression(InfixExpression),
+    BooleanExpression(BooleanExpression),
+    IfExpression(IfExpression),
+    FnLiteralExpression(FnLiteralExpression),
+    CallExpression(CallExpression),
+}
+
+pub trait Node {
     fn to_string(&self) -> String;
 }
 

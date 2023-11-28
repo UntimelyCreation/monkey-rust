@@ -1,14 +1,11 @@
 use std::fmt::Display;
 use std::{collections::HashMap, error::Error};
 
-use crate::ast::{
-    BlockStatement, BooleanExpression, CallExpression, ExpressionStatement, FnLiteralExpression,
-    IfExpression, InfixExpression, PrefixExpression,
-};
 use crate::{
     ast::{
-        Expression, IdentifierExpression, IntegerExpression, LetStatement, Program,
-        ReturnStatement, Statement,
+        BlockStatement, BooleanExpression, CallExpression, Expression, ExpressionStatement,
+        FnLiteralExpression, IdentifierExpression, IfExpression, InfixExpression,
+        IntegerExpression, LetStatement, PrefixExpression, Program, ReturnStatement, Statement,
     },
     lexer::Lexer,
     token::{Token, TokenType},
