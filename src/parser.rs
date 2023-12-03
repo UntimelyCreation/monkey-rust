@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::{collections::HashMap, error::Error};
 
+use crate::ast::StringExpression;
 use crate::{
     ast::{
         BlockStatement, BooleanExpression, CallExpression, Expression, ExpressionStatement,
@@ -104,6 +105,7 @@ impl Parser {
         self.register_prefix(TokenType::LParen, Parser::parse_grouped_expression);
         self.register_prefix(TokenType::If, Parser::parse_if_expression);
         self.register_prefix(TokenType::Function, Parser::parse_fn_literal_expression);
+        self.register_prefix(TokenType::String, Parser::parse_string_literal_expression);
 
         self.register_infix(TokenType::Plus, Parser::parse_infix_expression);
         self.register_infix(TokenType::Minus, Parser::parse_infix_expression);
@@ -395,6 +397,12 @@ impl Parser {
         };
 
         identifiers
+    }
+
+    fn parse_string_literal_expression(&mut self) -> Option<Expression> {
+        Some(Expression::String(StringExpression {
+            value: self.curr_token.literal.clone(),
+        }))
     }
 
     fn parse_call_expression(&mut self, lhs: Box<Expression>) -> Option<Expression> {

@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ast::{
-    AstNode, Expression, FnLiteralExpression, IdentifierExpression, IfExpression, Statement,
+use crate::ast::{AstNode, Expression, IdentifierExpression, IfExpression, Statement};
+use crate::object::{
+    Boolean, Environment, Error, Function, Integer, Object, ReturnValue, StringObj,
 };
-use crate::object::{Boolean, Environment, Error, Function, Integer, Object, ReturnValue};
 
 pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
     match node {
@@ -45,6 +45,7 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
         AstNode::Expression(expr) => match expr {
             Expression::Integer(int_expr) => eval(AstNode::IntegerExpression(int_expr), env),
             Expression::Boolean(bool_expr) => eval(AstNode::BooleanExpression(bool_expr), env),
+            Expression::String(string_expr) => eval(AstNode::StringExpression(string_expr), env),
             Expression::Prefix(prefix_expr) => eval(AstNode::PrefixExpression(prefix_expr), env),
             Expression::Infix(infix_expr) => eval(AstNode::InfixExpression(infix_expr), env),
             Expression::If(if_expr) => eval(AstNode::IfExpression(if_expr), env),
@@ -58,6 +59,7 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
         },
         AstNode::IntegerExpression(expr) => Some(Object::Integer(Integer { value: expr.value })),
         AstNode::BooleanExpression(expr) => Some(get_bool_object(expr.value)),
+        AstNode::StringExpression(expr) => Some(Object::String(StringObj { value: expr.value })),
         AstNode::PrefixExpression(expr) => {
             if let Some(rhs) = eval(AstNode::Expression(*expr.expr), env) {
                 match rhs {
@@ -203,6 +205,9 @@ fn eval_infix_expression(operator: String, lhs: Object, rhs: Object) -> Option<O
         (Object::Boolean(lhs_value), Object::Boolean(rhs_value)) => {
             eval_boolean_infix_expression(operator, *lhs_value, *rhs_value)
         }
+        (Object::String(lhs_value), Object::String(rhs_value)) => {
+            eval_string_infix_expression(operator, lhs_value.clone(), rhs_value.clone())
+        }
         _ => Some(new_error(format!(
             "unknown operator: {} {} {}",
             lhs.get_type_str(),
@@ -249,6 +254,25 @@ fn eval_boolean_infix_expression(operator: String, lhs: Boolean, rhs: Boolean) -
         operator if operator == *"!=" => Some(get_bool_object(left_value != right_value)),
         _ => Some(new_error(format!(
             "unknown operator: BOOLEAN {} BOOLEAN",
+            operator,
+        ))),
+    }
+}
+
+fn eval_string_infix_expression(
+    operator: String,
+    lhs: StringObj,
+    rhs: StringObj,
+) -> Option<Object> {
+    let left_value = lhs.value;
+    let right_value = rhs.value;
+
+    match operator {
+        operator if operator == *"+" => Some(Object::String(StringObj {
+            value: [left_value, right_value].join(""),
+        })),
+        _ => Some(new_error(format!(
+            "unknown operator: STRING {} STRING",
             operator,
         ))),
     }

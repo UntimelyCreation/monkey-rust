@@ -6,6 +6,7 @@ use crate::ast::{BlockStatement, IdentifierExpression, Node};
 pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
+    String(StringObj),
     ReturnValue(ReturnValue),
     Function(Function),
     Error(Error),
@@ -17,6 +18,7 @@ impl Object {
         match self {
             Object::Integer(_) => "INTEGER".to_string(),
             Object::Boolean(_) => "BOOLEAN".to_string(),
+            Object::String(_) => "STRING".to_string(),
             Object::ReturnValue(_) => "RETURN".to_string(),
             Object::Function(_) => "FUNCTION".to_string(),
             Object::Error(_) => "ERROR".to_string(),
@@ -27,6 +29,7 @@ impl Object {
         match self {
             Object::Integer(integer) => format!("{}", integer.value),
             Object::Boolean(boolean) => format!("{}", boolean.value),
+            Object::String(string) => string.value.clone(),
             Object::ReturnValue(return_value) => return_value.value.inspect(),
             Object::Function(function) => [
                 "fn(".to_string(),
@@ -54,6 +57,11 @@ pub struct Integer {
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Boolean {
     pub value: bool,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StringObj {
+    pub value: String,
 }
 
 #[derive(Debug, PartialEq, Clone)]

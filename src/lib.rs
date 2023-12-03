@@ -16,11 +16,11 @@ mod tests {
             AstNode, BlockStatement, BooleanExpression, CallExpression, Expression,
             ExpressionStatement, FnLiteralExpression, IdentifierExpression, IfExpression,
             InfixExpression, IntegerExpression, LetStatement, PrefixExpression, ReturnStatement,
-            Statement,
+            Statement, StringExpression,
         },
         evaluator::eval,
         lexer::Lexer,
-        object::{Boolean, Environment, Error, Integer, Object},
+        object::{Boolean, Environment, Error, Integer, Object, StringObj},
         parser::Parser,
         token::{Token, TokenType},
     };
@@ -45,7 +45,9 @@ mod tests {
         }
 
         10 == 10;
-        10 != 9;";
+        10 != 9;
+        \"foobar\"
+        \"foo bar\"";
 
         let lexer = Lexer::new(input);
         let expected = vec![
@@ -122,6 +124,8 @@ mod tests {
             Token::from_str(TokenType::NotEqual, "!="),
             Token::from_str(TokenType::Integer, "9"),
             Token::from_char(TokenType::Semicolon, ';'),
+            Token::from_str(TokenType::String, "foobar"),
+            Token::from_str(TokenType::String, "foo bar"),
             Token::from_char(TokenType::Eof, '\0'),
         ];
         assert_eq!(lexer.tokenize(), expected);
@@ -216,6 +220,23 @@ return x;";
 
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Integer(IntegerExpression { value: 5 }),
+        })];
+        let parsed_input = parser.parse_program().unwrap();
+        assert_eq!(*parsed_input, expected);
+        //assert_eq!(parsed_input.to_string(), input.to_string());
+    }
+
+    #[test]
+    fn test_parse_string_expression() {
+        let input = "\"hello world\";";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let expected = vec![Statement::Expression(ExpressionStatement {
+            expr: Expression::String(StringExpression {
+                value: "hello world".to_string(),
+            }),
         })];
         let parsed_input = parser.parse_program().unwrap();
         assert_eq!(*parsed_input, expected);
@@ -622,6 +643,28 @@ return x;";
 
             let expected = Object::Boolean(Boolean {
                 value: expected_values[i],
+            });
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_string_expressions() {
+        let inputs = ["\"Hello World!\"", "\"Hello \" + \"World!\""];
+        let expected_values = ["Hello World!", "Hello World!"];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = Object::String(StringObj {
+                value: expected_values[i].to_string(),
             });
 
             let program = parser.parse_program().unwrap();

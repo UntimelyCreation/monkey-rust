@@ -30,6 +30,7 @@ pub enum TokenType {
     // Identifiers
     Identifier,
     Integer,
+    String,
 
     // Operators
     Assign,

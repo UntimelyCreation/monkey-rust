@@ -12,6 +12,7 @@ pub enum AstNode {
     Expression(Expression),
     IdentifierExpression(IdentifierExpression),
     IntegerExpression(IntegerExpression),
+    StringExpression(StringExpression),
     PrefixExpression(PrefixExpression),
     InfixExpression(InfixExpression),
     BooleanExpression(BooleanExpression),
@@ -135,6 +136,7 @@ impl Node for BlockStatement {
 pub enum Expression {
     Identifier(IdentifierExpression),
     Integer(IntegerExpression),
+    String(StringExpression),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
     Boolean(BooleanExpression),
@@ -148,6 +150,7 @@ impl Node for Expression {
         match self {
             Expression::Identifier(expr) => expr.to_string(),
             Expression::Integer(expr) => expr.to_string(),
+            Expression::String(expr) => expr.to_string(),
             Expression::Prefix(expr) => expr.to_string(),
             Expression::Infix(expr) => expr.to_string(),
             Expression::Boolean(expr) => expr.to_string(),
@@ -177,6 +180,17 @@ pub struct IntegerExpression {
 impl Node for IntegerExpression {
     fn to_string(&self) -> String {
         self.value.to_string()
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct StringExpression {
+    pub value: String,
+}
+
+impl Node for StringExpression {
+    fn to_string(&self) -> String {
+        self.value.clone()
     }
 }
 

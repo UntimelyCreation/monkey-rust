@@ -68,6 +68,7 @@ impl Lexer {
             ')' => Token::from_char(TokenType::RParen, self.character),
             '{' => Token::from_char(TokenType::LBrace, self.character),
             '}' => Token::from_char(TokenType::RBrace, self.character),
+            '"' => Token::from_str(TokenType::String, &self.read_string()),
             '\0' => Token::from_char(TokenType::Eof, self.character),
             ch if ch.is_ascii_alphabetic() => {
                 let position = self.position;
@@ -95,6 +96,17 @@ impl Lexer {
             self.read_char();
         }
         token
+    }
+
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+        loop {
+            self.read_char();
+            if self.character == '"' || self.character == '\0' {
+                break;
+            }
+        }
+        self.input[position..self.position].to_string()
     }
 
     fn read_char(&mut self) {
