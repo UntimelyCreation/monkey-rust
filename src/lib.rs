@@ -850,4 +850,40 @@ return x;";
             assert_eq!(eval_input, expected);
         }
     }
+
+    #[test]
+    fn test_builtin_functions() {
+        let inputs = [
+            "len(\"\")",
+            "len(\"four\")",
+            "len(\"hello world\")",
+            "len(1)",
+            "len(\"one\", \"two\")",
+        ];
+        let expected_values = [
+            Object::Integer(Integer { value: 0 }),
+            Object::Integer(Integer { value: 4 }),
+            Object::Integer(Integer { value: 11 }),
+            Object::Error(Error {
+                message: "argument to 'len' not supported, found INTEGER".to_string(),
+            }),
+            Object::Error(Error {
+                message: "wrong number of arguments: expected 1, found 2".to_string(),
+            }),
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = expected_values[i].clone();
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
 }

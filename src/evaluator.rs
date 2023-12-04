@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::ast::{AstNode, Expression, IdentifierExpression, IfExpression, Statement};
 use crate::object::{
-    Boolean, Environment, Error, Function, Integer, Object, ReturnValue, StringObj,
+    Boolean, Builtin, Environment, Error, Function, Integer, Object, ReturnValue, StringObj,
 };
 
 pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
@@ -300,12 +300,13 @@ fn eval_identifier(
     identifier: IdentifierExpression,
     env: Rc<RefCell<Environment>>,
 ) -> Option<Object> {
-    match env.borrow().get(&identifier.value) {
+    let value = identifier.value;
+    match env.borrow().get(&value) {
         Some(val) => Some(val),
-        None => Some(new_error(format!(
-            "identifier not found: {}",
-            identifier.value
-        ))),
+        None => match get_builtin_fn(value.clone()) {
+            Some(builtin) => Some(builtin),
+            None => Some(new_error(format!("identifier not found: {}", value))),
+        },
     }
 }
 
@@ -319,6 +320,7 @@ fn apply_function(function: Object, args: Vec<Object>) -> Option<Object> {
             }
             evaluated
         }
+        Object::Builtin(builtin) => Some((builtin.function)(args)),
         _ => Some(new_error(format!(
             "not a function: {}",
             function.get_type_str(),
@@ -348,5 +350,31 @@ fn get_bool_object(expr: bool) -> Object {
         Object::Boolean(Boolean { value: true })
     } else {
         Object::Boolean(Boolean { value: false })
+    }
+}
+
+fn get_builtin_fn(name: String) -> Option<Object> {
+    match name {
+        str if &str == "len" => Some(Object::Builtin(Builtin {
+            function: |objs| {
+                if objs.len() != 1 {
+                    return new_error(format!(
+                        "wrong number of arguments: expected 1, found {}",
+                        objs.len()
+                    ));
+                }
+
+                match &objs[0] {
+                    Object::String(string) => Object::Integer(Integer {
+                        value: string.value.len() as i32,
+                    }),
+                    _ => new_error(format!(
+                        "argument to 'len' not supported, found {}",
+                        objs[0].get_type_str()
+                    )),
+                }
+            },
+        })),
+        _ => None,
     }
 }

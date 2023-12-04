@@ -9,9 +9,12 @@ pub enum Object {
     String(StringObj),
     ReturnValue(ReturnValue),
     Function(Function),
+    Builtin(Builtin),
     Error(Error),
     Null,
 }
+
+type BuiltinFn = fn(Vec<Object>) -> Object;
 
 impl Object {
     pub fn get_type_str(&self) -> String {
@@ -21,6 +24,7 @@ impl Object {
             Object::String(_) => "STRING".to_string(),
             Object::ReturnValue(_) => "RETURN".to_string(),
             Object::Function(_) => "FUNCTION".to_string(),
+            Object::Builtin(_) => "BUILTIN".to_string(),
             Object::Error(_) => "ERROR".to_string(),
             Object::Null => "NULL".to_string(),
         }
@@ -43,6 +47,7 @@ impl Object {
                 function.body.to_string(),
             ]
             .join(""),
+            Object::Builtin(_) => "builtin function".to_string(),
             Object::Error(error) => format!("ERROR: {}", error.message),
             Object::Null => "null".to_string(),
         }
@@ -74,6 +79,11 @@ pub struct Function {
     pub parameters: Vec<IdentifierExpression>,
     pub body: BlockStatement,
     pub env: Rc<RefCell<Environment>>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Builtin {
+    pub function: BuiltinFn,
 }
 
 #[derive(Debug, PartialEq, Clone)]
