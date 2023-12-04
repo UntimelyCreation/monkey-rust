@@ -10,6 +10,7 @@ pub enum Object {
     ReturnValue(ReturnValue),
     Function(Function),
     Builtin(Builtin),
+    Array(Array),
     Error(Error),
     Null,
 }
@@ -25,6 +26,7 @@ impl Object {
             Object::ReturnValue(_) => "RETURN".to_string(),
             Object::Function(_) => "FUNCTION".to_string(),
             Object::Builtin(_) => "BUILTIN".to_string(),
+            Object::Array(_) => "ARRAY".to_string(),
             Object::Error(_) => "ERROR".to_string(),
             Object::Null => "NULL".to_string(),
         }
@@ -48,6 +50,17 @@ impl Object {
             ]
             .join(""),
             Object::Builtin(_) => "builtin function".to_string(),
+            Object::Array(array) => [
+                "[".to_string(),
+                array
+                    .elements
+                    .iter()
+                    .map(|stmt| stmt.inspect())
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                "]".to_string(),
+            ]
+            .join(""),
             Object::Error(error) => format!("ERROR: {}", error.message),
             Object::Null => "null".to_string(),
         }
@@ -84,6 +97,11 @@ pub struct Function {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Builtin {
     pub function: BuiltinFn,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Array {
+    pub elements: Vec<Object>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

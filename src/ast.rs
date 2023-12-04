@@ -18,7 +18,9 @@ pub enum AstNode {
     BooleanExpression(BooleanExpression),
     IfExpression(IfExpression),
     FnLiteralExpression(FnLiteralExpression),
+    ArrayLiteralExpression(ArrayLiteralExpression),
     CallExpression(CallExpression),
+    IndexExpression(IndexExpression),
 }
 
 pub trait Node {
@@ -142,7 +144,9 @@ pub enum Expression {
     Boolean(BooleanExpression),
     If(IfExpression),
     FnLiteral(FnLiteralExpression),
+    ArrayLiteral(ArrayLiteralExpression),
     Call(CallExpression),
+    Index(IndexExpression),
 }
 
 impl Node for Expression {
@@ -156,7 +160,9 @@ impl Node for Expression {
             Expression::Boolean(expr) => expr.to_string(),
             Expression::If(expr) => expr.to_string(),
             Expression::FnLiteral(expr) => expr.to_string(),
+            Expression::ArrayLiteral(expr) => expr.to_string(),
             Expression::Call(expr) => expr.to_string(),
+            Expression::Index(expr) => expr.to_string(),
         }
     }
 }
@@ -291,6 +297,26 @@ impl Node for FnLiteralExpression {
 }
 
 #[derive(PartialEq, Debug, Clone)]
+pub struct ArrayLiteralExpression {
+    pub elements: Vec<Expression>,
+}
+
+impl Node for ArrayLiteralExpression {
+    fn to_string(&self) -> String {
+        [
+            "[".to_string(),
+            self.elements
+                .iter()
+                .map(|stmt| stmt.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            "]".to_string(),
+        ]
+        .join("")
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub struct CallExpression {
     pub function: Box<Expression>,
     pub arguments: Vec<Expression>,
@@ -307,6 +333,25 @@ impl Node for CallExpression {
                 .collect::<Vec<String>>()
                 .join(", "),
             ")".to_string(),
+        ]
+        .join("")
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct IndexExpression {
+    pub identifier: Box<Expression>,
+    pub index: Box<Expression>,
+}
+
+impl Node for IndexExpression {
+    fn to_string(&self) -> String {
+        [
+            "(".to_string(),
+            self.identifier.to_string(),
+            "[".to_string(),
+            self.index.to_string(),
+            "])".to_string(),
         ]
         .join("")
     }

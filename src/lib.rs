@@ -13,14 +13,14 @@ mod tests {
 
     use crate::{
         ast::{
-            AstNode, BlockStatement, BooleanExpression, CallExpression, Expression,
-            ExpressionStatement, FnLiteralExpression, IdentifierExpression, IfExpression,
-            InfixExpression, IntegerExpression, LetStatement, PrefixExpression, ReturnStatement,
-            Statement, StringExpression,
+            ArrayLiteralExpression, AstNode, BlockStatement, BooleanExpression, CallExpression,
+            Expression, ExpressionStatement, FnLiteralExpression, IdentifierExpression,
+            IfExpression, IndexExpression, InfixExpression, IntegerExpression, LetStatement,
+            PrefixExpression, ReturnStatement, Statement, StringExpression,
         },
         evaluator::eval,
         lexer::Lexer,
-        object::{Boolean, Environment, Error, Integer, Object, StringObj},
+        object::{Array, Boolean, Environment, Error, Integer, Object, StringObj},
         parser::Parser,
         token::{Token, TokenType},
     };
@@ -47,7 +47,8 @@ mod tests {
         10 == 10;
         10 != 9;
         \"foobar\"
-        \"foo bar\"";
+        \"foo bar\"
+        [1, 2];";
 
         let lexer = Lexer::new(input);
         let expected = vec![
@@ -126,6 +127,12 @@ mod tests {
             Token::from_char(TokenType::Semicolon, ';'),
             Token::from_str(TokenType::String, "foobar"),
             Token::from_str(TokenType::String, "foo bar"),
+            Token::from_char(TokenType::LBracket, '['),
+            Token::from_str(TokenType::Integer, "1"),
+            Token::from_char(TokenType::Comma, ','),
+            Token::from_str(TokenType::Integer, "2"),
+            Token::from_char(TokenType::RBracket, ']'),
+            Token::from_char(TokenType::Semicolon, ';'),
             Token::from_char(TokenType::Eof, '\0'),
         ];
         assert_eq!(lexer.tokenize(), expected);
@@ -341,6 +348,8 @@ return x;";
             "a + add(b * c) + d;",
             "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8));",
             "add(a + b + c * d / f + g);",
+            "a * [1, 2, 3, 4][b * c] * d",
+            "add(a * b[2], b[1], 2 * [1, 2][1])",
         ];
         let expected_strings = [
             "((-a) * b);",
@@ -357,6 +366,8 @@ return x;";
             "((a + add((b * c))) + d);",
             "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)));",
             "add((((a + b) + ((c * d) / f)) + g));",
+            "((a * ([1, 2, 3, 4][(b * c)])) * d);",
+            "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])));",
         ];
 
         for (i, input) in inputs.iter().enumerate() {
@@ -572,6 +583,68 @@ return x;";
                         rhs: Box::new(Expression::Integer(IntegerExpression { value: 5 })),
                     }),
                 ],
+            }),
+        })];
+        let parsed_input = parser.parse_program().unwrap();
+        assert_eq!(*parsed_input, expected);
+        //assert_eq!(parsed_input.to_string(), input.to_string());
+    }
+
+    #[test]
+    fn test_parse_array_literal() {
+        let input = "[1, 2 * 2, 3 + 3]";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let expected = vec![Statement::Expression(ExpressionStatement {
+            expr: Expression::ArrayLiteral(ArrayLiteralExpression {
+                elements: vec![
+                    Expression::Integer(IntegerExpression { value: 1 }),
+                    Expression::Infix(InfixExpression {
+                        operator: Token {
+                            kind: TokenType::Asterisk,
+                            literal: '*'.to_string(),
+                        },
+                        lhs: Box::new(Expression::Integer(IntegerExpression { value: 2 })),
+                        rhs: Box::new(Expression::Integer(IntegerExpression { value: 2 })),
+                    }),
+                    Expression::Infix(InfixExpression {
+                        operator: Token {
+                            kind: TokenType::Plus,
+                            literal: '+'.to_string(),
+                        },
+                        lhs: Box::new(Expression::Integer(IntegerExpression { value: 3 })),
+                        rhs: Box::new(Expression::Integer(IntegerExpression { value: 3 })),
+                    }),
+                ],
+            }),
+        })];
+        let parsed_input = parser.parse_program().unwrap();
+        assert_eq!(*parsed_input, expected);
+        //assert_eq!(parsed_input.to_string(), input.to_string());
+    }
+
+    #[test]
+    fn test_parse_index_expression() {
+        let input = "myArray[1 + 1]";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let expected = vec![Statement::Expression(ExpressionStatement {
+            expr: Expression::Index(IndexExpression {
+                identifier: Box::new(Expression::Identifier(IdentifierExpression {
+                    value: "myArray".to_string(),
+                })),
+                index: Box::new(Expression::Infix(InfixExpression {
+                    operator: Token {
+                        kind: TokenType::Plus,
+                        literal: '+'.to_string(),
+                    },
+                    lhs: Box::new(Expression::Integer(IntegerExpression { value: 1 })),
+                    rhs: Box::new(Expression::Integer(IntegerExpression { value: 1 })),
+                })),
             }),
         })];
         let parsed_input = parser.parse_program().unwrap();
@@ -823,7 +896,7 @@ return x;";
     }
 
     #[test]
-    fn test_function_application() {
+    fn test_function_applications() {
         let inputs = [
             "let identity = fn(x) { x; }; identity(5);",
             "let identity = fn(x) { return x; }; identity(5);",
@@ -859,6 +932,17 @@ return x;";
             "len(\"hello world\")",
             "len(1)",
             "len(\"one\", \"two\")",
+            "len([1, 2, 3, 4])",
+            "len([1, 5 * 6])",
+            "first([1, 2, 3, 4])",
+            "first(2)",
+            "last([1, 2, 3, 4])",
+            "last(fn(x) {x;})",
+            "rest([1, 2, 3, 4])",
+            "rest(\"hi\")",
+            "push([1, 2, 3, 4], 5)",
+            "push(\"no\", 5)",
+            "push([1])",
         ];
         let expected_values = [
             Object::Integer(Integer { value: 0 }),
@@ -870,6 +954,104 @@ return x;";
             Object::Error(Error {
                 message: "wrong number of arguments: expected 1, found 2".to_string(),
             }),
+            Object::Integer(Integer { value: 4 }),
+            Object::Integer(Integer { value: 2 }),
+            Object::Integer(Integer { value: 1 }),
+            Object::Error(Error {
+                message: "argument to 'first' must be ARRAY, found INTEGER".to_string(),
+            }),
+            Object::Integer(Integer { value: 4 }),
+            Object::Error(Error {
+                message: "argument to 'last' must be ARRAY, found FUNCTION".to_string(),
+            }),
+            Object::Array(Array {
+                elements: vec![
+                    Object::Integer(Integer { value: 2 }),
+                    Object::Integer(Integer { value: 3 }),
+                    Object::Integer(Integer { value: 4 }),
+                ],
+            }),
+            Object::Error(Error {
+                message: "argument to 'rest' must be ARRAY, found STRING".to_string(),
+            }),
+            Object::Array(Array {
+                elements: vec![
+                    Object::Integer(Integer { value: 1 }),
+                    Object::Integer(Integer { value: 2 }),
+                    Object::Integer(Integer { value: 3 }),
+                    Object::Integer(Integer { value: 4 }),
+                    Object::Integer(Integer { value: 5 }),
+                ],
+            }),
+            Object::Error(Error {
+                message: "argument to 'push' must be ARRAY, found STRING".to_string(),
+            }),
+            Object::Error(Error {
+                message: "wrong number of arguments: expected 2, found 1".to_string(),
+            }),
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = expected_values[i].clone();
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_array_literal() {
+        let input = "[1, 2 * 2, 3 + 3]";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let env = Rc::new(RefCell::new(Environment::new()));
+
+        let expected = Object::Array(Array {
+            elements: vec![
+                Object::Integer(Integer { value: 1 }),
+                Object::Integer(Integer { value: 4 }),
+                Object::Integer(Integer { value: 6 }),
+            ],
+        });
+
+        let program = parser.parse_program().unwrap();
+        println!("{program:?}");
+        let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+        assert_eq!(eval_input, expected);
+    }
+
+    #[test]
+    fn test_eval_array_index_expressions() {
+        let inputs = [
+            "[1, 2, 3][0]",
+            "[1, 2, 3][1]",
+            "[1, 2, 3][2]",
+            "let i = 0; [1][i];",
+            "[1, 2, 3][1 + 1];",
+            "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+            "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+            "[1, 2, 3][3]",
+            "[1, 2, 3][-1]",
+        ];
+        let expected_values = [
+            Object::Integer(Integer { value: 1 }),
+            Object::Integer(Integer { value: 2 }),
+            Object::Integer(Integer { value: 3 }),
+            Object::Integer(Integer { value: 1 }),
+            Object::Integer(Integer { value: 3 }),
+            Object::Integer(Integer { value: 6 }),
+            Object::Integer(Integer { value: 2 }),
+            Object::Null,
+            Object::Null,
         ];
 
         for (i, input) in inputs.iter().enumerate() {

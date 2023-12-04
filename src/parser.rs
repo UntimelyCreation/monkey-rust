@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::{collections::HashMap, error::Error};
 
-use crate::ast::StringExpression;
+use crate::ast::{ArrayLiteralExpression, IndexExpression, StringExpression};
 use crate::{
     ast::{
         BlockStatement, BooleanExpression, CallExpression, Expression, ExpressionStatement,
@@ -19,6 +19,7 @@ const SUM: usize = 4;
 const PRODUCT: usize = 5;
 const PREFIX: usize = 6;
 const CALL: usize = 7;
+const INDEX: usize = 8;
 
 type PrefixParseFn = for<'a> fn(&'a mut Parser) -> Option<Expression>;
 type InfixParseFn = for<'a> fn(&'a mut Parser, Box<Expression>) -> Option<Expression>;
@@ -93,6 +94,7 @@ impl Parser {
         self.precedences.insert(TokenType::Slash, PRODUCT);
         self.precedences.insert(TokenType::Asterisk, PRODUCT);
         self.precedences.insert(TokenType::LParen, CALL);
+        self.precedences.insert(TokenType::LBracket, INDEX);
     }
 
     fn init_parse_fns(&mut self) {
@@ -105,6 +107,7 @@ impl Parser {
         self.register_prefix(TokenType::LParen, Parser::parse_grouped_expression);
         self.register_prefix(TokenType::If, Parser::parse_if_expression);
         self.register_prefix(TokenType::Function, Parser::parse_fn_literal_expression);
+        self.register_prefix(TokenType::LBracket, Parser::parse_array_literal_expression);
         self.register_prefix(TokenType::String, Parser::parse_string_literal_expression);
 
         self.register_infix(TokenType::Plus, Parser::parse_infix_expression);
@@ -116,6 +119,7 @@ impl Parser {
         self.register_infix(TokenType::LessThan, Parser::parse_infix_expression);
         self.register_infix(TokenType::GreaterThan, Parser::parse_infix_expression);
         self.register_infix(TokenType::LParen, Parser::parse_call_expression);
+        self.register_infix(TokenType::LBracket, Parser::parse_index_expression);
     }
 
     pub fn parse_program(&mut self) -> Option<Program> {
@@ -408,36 +412,56 @@ impl Parser {
     fn parse_call_expression(&mut self, lhs: Box<Expression>) -> Option<Expression> {
         Some(Expression::Call(CallExpression {
             function: lhs,
-            arguments: self.parse_call_arguments(),
+            arguments: self.parse_expression_list(TokenType::RParen),
         }))
     }
 
-    fn parse_call_arguments(&mut self) -> Vec<Expression> {
-        let mut arguments = Vec::new();
+    fn parse_array_literal_expression(&mut self) -> Option<Expression> {
+        Some(Expression::ArrayLiteral(ArrayLiteralExpression {
+            elements: self.parse_expression_list(TokenType::RBracket),
+        }))
+    }
 
-        if self.peek_token.kind == TokenType::RParen {
+    fn parse_expression_list(&mut self, end: TokenType) -> Vec<Expression> {
+        let mut exprs = Vec::new();
+
+        if self.peek_token.kind == end {
             self.next_token();
-            return arguments;
-        };
+            return exprs;
+        }
 
         self.next_token();
         if let Some(expr) = self.parse_expression(LOWEST) {
-            arguments.push(expr);
+            exprs.push(expr);
         }
 
         while self.peek_token.kind == TokenType::Comma {
             self.next_token();
             self.next_token();
             if let Some(expr) = self.parse_expression(LOWEST) {
-                arguments.push(expr);
+                exprs.push(expr);
             }
         }
 
-        if !self.expect_peek(TokenType::RParen) {
+        if !self.expect_peek(end) {
             return Vec::new();
+        }
+
+        exprs
+    }
+
+    fn parse_index_expression(&mut self, lhs: Box<Expression>) -> Option<Expression> {
+        self.next_token();
+        let index = Box::new(self.parse_expression(LOWEST).unwrap());
+
+        if !self.expect_peek(TokenType::RBracket) {
+            return None;
         };
 
-        arguments
+        Some(Expression::Index(IndexExpression {
+            identifier: lhs,
+            index,
+        }))
     }
 
     fn next_token(&mut self) {
