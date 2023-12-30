@@ -64,6 +64,7 @@ impl Lexer {
             '>' => Token::from_char(TokenType::GreaterThan, self.character),
             ',' => Token::from_char(TokenType::Comma, self.character),
             ';' => Token::from_char(TokenType::Semicolon, self.character),
+            ':' => Token::from_char(TokenType::Colon, self.character),
             '(' => Token::from_char(TokenType::LParen, self.character),
             ')' => Token::from_char(TokenType::RParen, self.character),
             '{' => Token::from_char(TokenType::LBrace, self.character),

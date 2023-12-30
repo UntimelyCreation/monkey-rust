@@ -9,14 +9,15 @@ mod token;
 #[warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
+    use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
     use crate::{
         ast::{
             ArrayLiteralExpression, AstNode, BlockStatement, BooleanExpression, CallExpression,
-            Expression, ExpressionStatement, FnLiteralExpression, IdentifierExpression,
-            IfExpression, IndexExpression, InfixExpression, IntegerExpression, LetStatement,
-            PrefixExpression, ReturnStatement, Statement, StringExpression,
+            Expression, ExpressionStatement, FnLiteralExpression, HashLiteralExpression,
+            IdentifierExpression, IfExpression, IndexExpression, InfixExpression,
+            IntegerExpression, LetStatement, PrefixExpression, ReturnStatement, Statement,
+            StringExpression,
         },
         evaluator::eval,
         lexer::Lexer,
@@ -48,7 +49,8 @@ mod tests {
         10 != 9;
         \"foobar\"
         \"foo bar\"
-        [1, 2];";
+        [1, 2]
+        {\"foo\": \"bar\"};";
 
         let lexer = Lexer::new(input);
         let expected = vec![
@@ -132,6 +134,11 @@ mod tests {
             Token::from_char(TokenType::Comma, ','),
             Token::from_str(TokenType::Integer, "2"),
             Token::from_char(TokenType::RBracket, ']'),
+            Token::from_char(TokenType::LBrace, '{'),
+            Token::from_str(TokenType::String, "foo"),
+            Token::from_char(TokenType::Colon, ':'),
+            Token::from_str(TokenType::String, "bar"),
+            Token::from_char(TokenType::RBrace, '}'),
             Token::from_char(TokenType::Semicolon, ';'),
             Token::from_char(TokenType::Eof, '\0'),
         ];
@@ -618,6 +625,63 @@ return x;";
                         rhs: Box::new(Expression::Integer(IntegerExpression { value: 3 })),
                     }),
                 ],
+            }),
+        })];
+        let parsed_input = parser.parse_program().unwrap();
+        assert_eq!(*parsed_input, expected);
+        //assert_eq!(parsed_input.to_string(), input.to_string());
+    }
+
+    #[test]
+    fn test_parse_hash_literal() {
+        let input = "{ \"one\": 1, true: 2, 3: 16/4 }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let mut expected_map = BTreeMap::new();
+        expected_map.insert(
+            Expression::String(StringExpression {
+                value: "one".to_string(),
+            }),
+            Expression::Integer(IntegerExpression { value: 1 }),
+        );
+        expected_map.insert(
+            Expression::Boolean(BooleanExpression { value: true }),
+            Expression::Integer(IntegerExpression { value: 2 }),
+        );
+        expected_map.insert(
+            Expression::Integer(IntegerExpression { value: 3 }),
+            Expression::Infix(InfixExpression {
+                operator: Token {
+                    kind: TokenType::Slash,
+                    literal: '/'.to_string(),
+                },
+                lhs: Box::new(Expression::Integer(IntegerExpression { value: 16 })),
+                rhs: Box::new(Expression::Integer(IntegerExpression { value: 4 })),
+            }),
+        );
+
+        let expected = vec![Statement::Expression(ExpressionStatement {
+            expr: Expression::HashLiteral(HashLiteralExpression {
+                pairs: expected_map,
+            }),
+        })];
+        let parsed_input = parser.parse_program().unwrap();
+        assert_eq!(*parsed_input, expected);
+        //assert_eq!(parsed_input.to_string(), input.to_string());
+    }
+
+    #[test]
+    fn test_parse_empty_hash_literal() {
+        let input = "{ }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let expected = vec![Statement::Expression(ExpressionStatement {
+            expr: Expression::HashLiteral(HashLiteralExpression {
+                pairs: BTreeMap::new(),
             }),
         })];
         let parsed_input = parser.parse_program().unwrap();

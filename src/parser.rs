@@ -1,7 +1,10 @@
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::{collections::HashMap, error::Error};
 
-use crate::ast::{ArrayLiteralExpression, IndexExpression, StringExpression};
+use crate::ast::{
+    ArrayLiteralExpression, HashLiteralExpression, IndexExpression, StringExpression,
+};
 use crate::{
     ast::{
         BlockStatement, BooleanExpression, CallExpression, Expression, ExpressionStatement,
@@ -108,6 +111,7 @@ impl Parser {
         self.register_prefix(TokenType::If, Parser::parse_if_expression);
         self.register_prefix(TokenType::Function, Parser::parse_fn_literal_expression);
         self.register_prefix(TokenType::LBracket, Parser::parse_array_literal_expression);
+        self.register_prefix(TokenType::LBrace, Parser::parse_hash_literal_expression);
         self.register_prefix(TokenType::String, Parser::parse_string_literal_expression);
 
         self.register_infix(TokenType::Plus, Parser::parse_infix_expression);
@@ -232,9 +236,7 @@ impl Parser {
 
         self.next_token();
 
-        while !(self.curr_token.kind == TokenType::RBrace)
-            && !(self.curr_token.kind == TokenType::Eof)
-        {
+        while self.curr_token.kind != TokenType::RBrace && self.curr_token.kind != TokenType::Eof {
             if let Some(stmt) = self.parse_statement() {
                 statements.push(stmt);
             }
@@ -462,6 +464,34 @@ impl Parser {
             identifier: lhs,
             index,
         }))
+    }
+
+    fn parse_hash_literal_expression(&mut self) -> Option<Expression> {
+        let mut pairs = BTreeMap::new();
+
+        while self.peek_token.kind != TokenType::RBrace {
+            self.next_token();
+            let key = self.parse_expression(LOWEST).unwrap();
+
+            if !self.expect_peek(TokenType::Colon) {
+                return None;
+            }
+
+            self.next_token();
+            let value = self.parse_expression(LOWEST).unwrap();
+
+            pairs.insert(key, value);
+
+            if self.peek_token.kind != TokenType::RBrace && !self.expect_peek(TokenType::Comma) {
+                return None;
+            }
+        }
+
+        if !self.expect_peek(TokenType::RBrace) {
+            return None;
+        }
+
+        Some(Expression::HashLiteral(HashLiteralExpression { pairs }))
     }
 
     fn next_token(&mut self) {

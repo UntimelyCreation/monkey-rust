@@ -60,6 +60,7 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
             }
             Expression::Call(call_expr) => eval(AstNode::CallExpression(call_expr), env),
             Expression::Index(index_expr) => eval(AstNode::IndexExpression(index_expr), env),
+            _ => todo!(),
         },
         AstNode::IntegerExpression(expr) => Some(Object::Integer(Integer { value: expr.value })),
         AstNode::BooleanExpression(expr) => Some(get_bool_object(expr.value)),
@@ -140,6 +141,7 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
                 None
             }
         }
+        _ => todo!(),
     }
 }
 
