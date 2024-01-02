@@ -21,7 +21,9 @@ mod tests {
         },
         evaluator::eval,
         lexer::Lexer,
-        object::{Array, Boolean, Environment, Error, Integer, Object, StringObj},
+        object::{
+            Array, Boolean, Environment, Error, HashObj, HashPair, Integer, Object, StringObj,
+        },
         parser::Parser,
         token::{Token, TokenType},
     };
@@ -904,6 +906,7 @@ return x;";
             "5; true / false; 5",
             "if (10 > 1) { true + false; }",
             "foobar",
+            "{\"name\": \"Monkey\"}[fn(x) { x }]",
         ];
         let expected_values = [
             "unknown operator: INTEGER + BOOLEAN",
@@ -913,6 +916,7 @@ return x;";
             "unknown operator: BOOLEAN / BOOLEAN",
             "unknown operator: BOOLEAN + BOOLEAN",
             "identifier not found: foobar",
+            "unusable as hash key: FUNCTION",
         ];
 
         for (i, input) in inputs.iter().enumerate() {
@@ -1071,7 +1075,7 @@ return x;";
     }
 
     #[test]
-    fn test_array_literal() {
+    fn test_eval_array_literal() {
         let input = "[1, 2 * 2, 3 + 3]";
 
         let lexer = Lexer::new(input);
@@ -1086,6 +1090,88 @@ return x;";
             ],
         });
 
+        let program = parser.parse_program().unwrap();
+        println!("{program:?}");
+        let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+        assert_eq!(eval_input, expected);
+    }
+
+    #[test]
+    fn test_eval_hash_literal() {
+        let input = "let two = \"two\";
+            { 
+                \"one\": 10 - 9,
+                two: 1 + 1,
+                \"thr\" + \"ee\": 6 / 2,
+                4: 4,
+                true: 5,
+                false: 6
+            }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let env = Rc::new(RefCell::new(Environment::new()));
+
+        let mut expected_pairs = BTreeMap::new();
+        let key_one = Object::String(StringObj {
+            value: "one".to_string(),
+        });
+        expected_pairs.insert(
+            key_one.get_hash_key().unwrap(),
+            HashPair {
+                key: key_one,
+                value: Object::Integer(Integer { value: 1 }),
+            },
+        );
+        let key_two = Object::String(StringObj {
+            value: "two".to_string(),
+        });
+        expected_pairs.insert(
+            key_two.get_hash_key().unwrap(),
+            HashPair {
+                key: key_two,
+                value: Object::Integer(Integer { value: 2 }),
+            },
+        );
+        let key_three = Object::String(StringObj {
+            value: "three".to_string(),
+        });
+        expected_pairs.insert(
+            key_three.get_hash_key().unwrap(),
+            HashPair {
+                key: key_three,
+                value: Object::Integer(Integer { value: 3 }),
+            },
+        );
+        let key_four = Object::Integer(Integer { value: 4 });
+        expected_pairs.insert(
+            key_four.get_hash_key().unwrap(),
+            HashPair {
+                key: key_four.clone(),
+                value: key_four,
+            },
+        );
+        let key_five = Object::Boolean(Boolean { value: true });
+        expected_pairs.insert(
+            key_five.get_hash_key().unwrap(),
+            HashPair {
+                key: key_five,
+                value: Object::Integer(Integer { value: 5 }),
+            },
+        );
+        let key_six = Object::Boolean(Boolean { value: false });
+        expected_pairs.insert(
+            key_six.get_hash_key().unwrap(),
+            HashPair {
+                key: key_six,
+                value: Object::Integer(Integer { value: 6 }),
+            },
+        );
+
+        let expected = Object::Hash(HashObj {
+            pairs: expected_pairs,
+        });
         let program = parser.parse_program().unwrap();
         println!("{program:?}");
         let eval_input = eval(AstNode::Program(program), env).unwrap();
@@ -1116,6 +1202,42 @@ return x;";
             Object::Integer(Integer { value: 2 }),
             Object::Null,
             Object::Null,
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let env = Rc::new(RefCell::new(Environment::new()));
+
+            let expected = expected_values[i].clone();
+
+            let program = parser.parse_program().unwrap();
+            println!("{program:?}");
+            let eval_input = eval(AstNode::Program(program), env).unwrap();
+
+            assert_eq!(eval_input, expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_hash_index_expressions() {
+        let inputs = [
+            "{\"foo\": 5}[\"foo\"]",
+            "{\"foo\": 5}[\"bar\"]",
+            "let key = \"foo\"; {\"foo\": 5}[key]",
+            "{}[\"foo\"]",
+            "{5: 5}[5]",
+            "{true: 5}[true]",
+            "{false: 5}[false]",
+        ];
+        let expected_values = [
+            Object::Integer(Integer { value: 5 }),
+            Object::Null,
+            Object::Integer(Integer { value: 5 }),
+            Object::Null,
+            Object::Integer(Integer { value: 5 }),
+            Object::Integer(Integer { value: 5 }),
+            Object::Integer(Integer { value: 5 }),
         ];
 
         for (i, input) in inputs.iter().enumerate() {

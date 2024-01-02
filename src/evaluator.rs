@@ -1,9 +1,13 @@
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use crate::ast::{AstNode, Expression, IdentifierExpression, IfExpression, Statement};
+use crate::ast::{
+    AstNode, Expression, HashLiteralExpression, IdentifierExpression, IfExpression, Statement,
+};
 use crate::object::{
-    Array, Boolean, Builtin, Environment, Error, Function, Integer, Object, ReturnValue, StringObj,
+    Array, Boolean, Builtin, Environment, Error, Function, HashObj, HashPair, Integer, Object,
+    ReturnValue, StringObj,
 };
 
 pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
@@ -58,9 +62,11 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
             Expression::ArrayLiteral(array_literal_expr) => {
                 eval(AstNode::ArrayLiteralExpression(array_literal_expr), env)
             }
+            Expression::HashLiteral(hash_literal_expr) => {
+                eval(AstNode::HashLiteralExpression(hash_literal_expr), env)
+            }
             Expression::Call(call_expr) => eval(AstNode::CallExpression(call_expr), env),
             Expression::Index(index_expr) => eval(AstNode::IndexExpression(index_expr), env),
-            _ => todo!(),
         },
         AstNode::IntegerExpression(expr) => Some(Object::Integer(Integer { value: expr.value })),
         AstNode::BooleanExpression(expr) => Some(get_bool_object(expr.value)),
@@ -104,6 +110,7 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
         AstNode::ArrayLiteralExpression(expr) => Some(Object::Array(Array {
             elements: eval_expressions(expr.elements, env),
         })),
+        AstNode::HashLiteralExpression(expr) => eval_hash_literal(expr, env),
         AstNode::CallExpression(expr) => {
             if let Some(function) = eval(AstNode::Expression(*expr.function), env.clone()) {
                 match function {
@@ -141,7 +148,6 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
                 None
             }
         }
-        _ => todo!(),
     }
 }
 
@@ -370,6 +376,7 @@ fn eval_index_expression(identifier: Object, index: Object) -> Option<Object> {
         (Object::Array(array), Object::Integer(integer)) => {
             eval_array_index_expression(array.clone(), integer.value as usize)
         }
+        (Object::Hash(hash), index) => eval_hash_index_expression(hash.clone(), index.clone()),
         _ => Some(new_error(format!(
             "index operator not supported: {}",
             identifier.get_type_str()
@@ -383,6 +390,60 @@ fn eval_array_index_expression(array: Array, index: usize) -> Option<Object> {
     }
 
     Some(array.elements[index].clone())
+}
+
+fn eval_hash_index_expression(hash: HashObj, index: Object) -> Option<Object> {
+    if let Some(hash_key) = index.get_hash_key() {
+        if let Some(pair) = hash.pairs.get(&hash_key) {
+            Some(pair.value.clone())
+        } else {
+            Some(Object::Null)
+        }
+    } else {
+        Some(new_error(format!(
+            "unusable as hash key: {}",
+            index.get_type_str()
+        )))
+    }
+}
+
+fn eval_hash_literal(
+    hash_literal: HashLiteralExpression,
+    env: Rc<RefCell<Environment>>,
+) -> Option<Object> {
+    let mut pairs = BTreeMap::new();
+
+    for (key_expr, value_expr) in hash_literal.pairs.iter() {
+        if let Some(key) = eval(AstNode::Expression(key_expr.clone()), env.clone()) {
+            match key {
+                Object::Error(_) => {
+                    return Some(key);
+                }
+                _ => match key.get_hash_key() {
+                    Some(hash_key) => {
+                        if let Some(value) =
+                            eval(AstNode::Expression(value_expr.clone()), env.clone())
+                        {
+                            match value {
+                                Object::Error(_) => {
+                                    return Some(value);
+                                }
+                                _ => pairs.insert(hash_key, HashPair { key, value }),
+                            };
+                        }
+                    }
+                    None => {
+                        return Some(new_error(format!(
+                            "unusable as hash key: {}",
+                            key.get_type_str()
+                        )));
+                    }
+                },
+            }
+        }
+    }
+
+    Some(Object::Hash(HashObj { pairs }))
 }
 
 fn new_error(message: String) -> Object {
