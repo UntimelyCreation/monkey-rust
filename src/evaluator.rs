@@ -583,6 +583,15 @@ fn get_builtin_fn(name: String) -> Option<Object> {
                 }
             },
         })),
+        str if &str == "puts" => Some(Object::Builtin(Builtin {
+            function: |objs| {
+                for obj in objs.iter() {
+                    println!("{}", obj.inspect());
+                }
+
+                Object::Null
+            },
+        })),
         _ => None,
     }
 }
