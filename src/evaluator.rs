@@ -1,10 +1,14 @@
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use crate::ast::{
-    AstNode, Expression, FnLiteralExpression, IdentifierExpression, IfExpression, Statement,
+    AstNode, Expression, HashLiteralExpression, IdentifierExpression, IfExpression, Statement,
 };
-use crate::object::{Boolean, Environment, Error, Function, Integer, Object, ReturnValue};
+use crate::object::{
+    Array, Boolean, Builtin, Environment, Error, Function, HashObj, HashPair, Integer, Object,
+    ReturnValue, StringObj,
+};
 
 pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
     match node {
@@ -45,6 +49,7 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
         AstNode::Expression(expr) => match expr {
             Expression::Integer(int_expr) => eval(AstNode::IntegerExpression(int_expr), env),
             Expression::Boolean(bool_expr) => eval(AstNode::BooleanExpression(bool_expr), env),
+            Expression::String(string_expr) => eval(AstNode::StringExpression(string_expr), env),
             Expression::Prefix(prefix_expr) => eval(AstNode::PrefixExpression(prefix_expr), env),
             Expression::Infix(infix_expr) => eval(AstNode::InfixExpression(infix_expr), env),
             Expression::If(if_expr) => eval(AstNode::IfExpression(if_expr), env),
@@ -54,10 +59,18 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
             Expression::FnLiteral(fn_literal_expr) => {
                 eval(AstNode::FnLiteralExpression(fn_literal_expr), env)
             }
+            Expression::ArrayLiteral(array_literal_expr) => {
+                eval(AstNode::ArrayLiteralExpression(array_literal_expr), env)
+            }
+            Expression::HashLiteral(hash_literal_expr) => {
+                eval(AstNode::HashLiteralExpression(hash_literal_expr), env)
+            }
             Expression::Call(call_expr) => eval(AstNode::CallExpression(call_expr), env),
+            Expression::Index(index_expr) => eval(AstNode::IndexExpression(index_expr), env),
         },
         AstNode::IntegerExpression(expr) => Some(Object::Integer(Integer { value: expr.value })),
         AstNode::BooleanExpression(expr) => Some(get_bool_object(expr.value)),
+        AstNode::StringExpression(expr) => Some(Object::String(StringObj { value: expr.value })),
         AstNode::PrefixExpression(expr) => {
             if let Some(rhs) = eval(AstNode::Expression(*expr.expr), env) {
                 match rhs {
@@ -88,11 +101,16 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
             }
         }
         AstNode::IdentifierExpression(expr) => eval_identifier(expr, env),
+        AstNode::IfExpression(expr) => eval_if_expression(expr, env),
         AstNode::FnLiteralExpression(expr) => Some(Object::Function(Function {
             parameters: expr.parameters,
             body: expr.body,
             env,
         })),
+        AstNode::ArrayLiteralExpression(expr) => Some(Object::Array(Array {
+            elements: eval_expressions(expr.elements, env),
+        })),
+        AstNode::HashLiteralExpression(expr) => eval_hash_literal(expr, env),
         AstNode::CallExpression(expr) => {
             if let Some(function) = eval(AstNode::Expression(*expr.function), env.clone()) {
                 match function {
@@ -111,7 +129,25 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
                 None
             }
         }
-        AstNode::IfExpression(expr) => eval_if_expression(expr, env),
+        AstNode::IndexExpression(expr) => {
+            if let Some(identifier) = eval(AstNode::Expression(*expr.identifier), env.clone()) {
+                match identifier {
+                    Object::Error(_) => Some(identifier),
+                    _ => {
+                        if let Some(index) = eval(AstNode::Expression(*expr.index), env) {
+                            match index {
+                                Object::Error(_) => Some(index),
+                                _ => eval_index_expression(identifier, index),
+                            }
+                        } else {
+                            None
+                        }
+                    }
+                }
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -203,6 +239,9 @@ fn eval_infix_expression(operator: String, lhs: Object, rhs: Object) -> Option<O
         (Object::Boolean(lhs_value), Object::Boolean(rhs_value)) => {
             eval_boolean_infix_expression(operator, *lhs_value, *rhs_value)
         }
+        (Object::String(lhs_value), Object::String(rhs_value)) => {
+            eval_string_infix_expression(operator, lhs_value.clone(), rhs_value.clone())
+        }
         _ => Some(new_error(format!(
             "unknown operator: {} {} {}",
             lhs.get_type_str(),
@@ -254,6 +293,25 @@ fn eval_boolean_infix_expression(operator: String, lhs: Boolean, rhs: Boolean) -
     }
 }
 
+fn eval_string_infix_expression(
+    operator: String,
+    lhs: StringObj,
+    rhs: StringObj,
+) -> Option<Object> {
+    let left_value = lhs.value;
+    let right_value = rhs.value;
+
+    match operator {
+        operator if operator == *"+" => Some(Object::String(StringObj {
+            value: [left_value, right_value].join(""),
+        })),
+        _ => Some(new_error(format!(
+            "unknown operator: STRING {} STRING",
+            operator,
+        ))),
+    }
+}
+
 fn eval_if_expression(expr: IfExpression, env: Rc<RefCell<Environment>>) -> Option<Object> {
     let condition = eval(AstNode::Expression(*expr.condition), env.clone());
 
@@ -276,12 +334,13 @@ fn eval_identifier(
     identifier: IdentifierExpression,
     env: Rc<RefCell<Environment>>,
 ) -> Option<Object> {
-    match env.borrow().get(&identifier.value) {
+    let value = identifier.value;
+    match env.borrow().get(&value) {
         Some(val) => Some(val),
-        None => Some(new_error(format!(
-            "identifier not found: {}",
-            identifier.value
-        ))),
+        None => match get_builtin_fn(value.clone()) {
+            Some(builtin) => Some(builtin),
+            None => Some(new_error(format!("identifier not found: {}", value))),
+        },
     }
 }
 
@@ -295,6 +354,7 @@ fn apply_function(function: Object, args: Vec<Object>) -> Option<Object> {
             }
             evaluated
         }
+        Object::Builtin(builtin) => Some((builtin.function)(args)),
         _ => Some(new_error(format!(
             "not a function: {}",
             function.get_type_str(),
@@ -311,6 +371,81 @@ fn extend_function_env(function: &Function, args: Vec<Object>) -> Environment {
     env
 }
 
+fn eval_index_expression(identifier: Object, index: Object) -> Option<Object> {
+    match (&identifier, &index) {
+        (Object::Array(array), Object::Integer(integer)) => {
+            eval_array_index_expression(array.clone(), integer.value as usize)
+        }
+        (Object::Hash(hash), index) => eval_hash_index_expression(hash.clone(), index.clone()),
+        _ => Some(new_error(format!(
+            "index operator not supported: {}",
+            identifier.get_type_str()
+        ))),
+    }
+}
+
+fn eval_array_index_expression(array: Array, index: usize) -> Option<Object> {
+    if index > array.elements.len() - 1 {
+        return Some(Object::Null);
+    }
+
+    Some(array.elements[index].clone())
+}
+
+fn eval_hash_index_expression(hash: HashObj, index: Object) -> Option<Object> {
+    if let Some(hash_key) = index.get_hash_key() {
+        if let Some(pair) = hash.pairs.get(&hash_key) {
+            Some(pair.value.clone())
+        } else {
+            Some(Object::Null)
+        }
+    } else {
+        Some(new_error(format!(
+            "unusable as hash key: {}",
+            index.get_type_str()
+        )))
+    }
+}
+
+fn eval_hash_literal(
+    hash_literal: HashLiteralExpression,
+    env: Rc<RefCell<Environment>>,
+) -> Option<Object> {
+    let mut pairs = BTreeMap::new();
+
+    for (key_expr, value_expr) in hash_literal.pairs.iter() {
+        if let Some(key) = eval(AstNode::Expression(key_expr.clone()), env.clone()) {
+            match key {
+                Object::Error(_) => {
+                    return Some(key);
+                }
+                _ => match key.get_hash_key() {
+                    Some(hash_key) => {
+                        if let Some(value) =
+                            eval(AstNode::Expression(value_expr.clone()), env.clone())
+                        {
+                            match value {
+                                Object::Error(_) => {
+                                    return Some(value);
+                                }
+                                _ => pairs.insert(hash_key, HashPair { key, value }),
+                            };
+                        }
+                    }
+                    None => {
+                        return Some(new_error(format!(
+                            "unusable as hash key: {}",
+                            key.get_type_str()
+                        )));
+                    }
+                },
+            }
+        }
+    }
+
+    Some(Object::Hash(HashObj { pairs }))
+}
+
 fn new_error(message: String) -> Object {
     Object::Error(Error { message })
 }
@@ -324,5 +459,139 @@ fn get_bool_object(expr: bool) -> Object {
         Object::Boolean(Boolean { value: true })
     } else {
         Object::Boolean(Boolean { value: false })
+    }
+}
+
+fn get_builtin_fn(name: String) -> Option<Object> {
+    match name {
+        str if &str == "len" => Some(Object::Builtin(Builtin {
+            function: |objs| {
+                if objs.len() != 1 {
+                    return new_error(format!(
+                        "wrong number of arguments: expected 1, found {}",
+                        objs.len()
+                    ));
+                }
+
+                match &objs[0] {
+                    Object::String(string) => Object::Integer(Integer {
+                        value: string.value.len() as i32,
+                    }),
+                    Object::Array(array) => Object::Integer(Integer {
+                        value: array.elements.len() as i32,
+                    }),
+                    _ => new_error(format!(
+                        "argument to 'len' not supported, found {}",
+                        objs[0].get_type_str()
+                    )),
+                }
+            },
+        })),
+        str if &str == "first" => Some(Object::Builtin(Builtin {
+            function: |objs| {
+                if objs.len() != 1 {
+                    return new_error(format!(
+                        "wrong number of arguments: expected 1, found {}",
+                        objs.len()
+                    ));
+                }
+
+                match &objs[0] {
+                    Object::Array(array) => {
+                        if !array.elements.is_empty() {
+                            array.elements[0].clone()
+                        } else {
+                            Object::Null
+                        }
+                    }
+                    _ => new_error(format!(
+                        "argument to 'first' must be ARRAY, found {}",
+                        objs[0].get_type_str()
+                    )),
+                }
+            },
+        })),
+        str if &str == "last" => Some(Object::Builtin(Builtin {
+            function: |objs| {
+                if objs.len() != 1 {
+                    return new_error(format!(
+                        "wrong number of arguments: expected 1, found {}",
+                        objs.len()
+                    ));
+                }
+
+                match &objs[0] {
+                    Object::Array(array) => {
+                        if !array.elements.is_empty() {
+                            array.elements.last().unwrap().clone()
+                        } else {
+                            Object::Null
+                        }
+                    }
+                    _ => new_error(format!(
+                        "argument to 'last' must be ARRAY, found {}",
+                        objs[0].get_type_str()
+                    )),
+                }
+            },
+        })),
+        str if &str == "rest" => Some(Object::Builtin(Builtin {
+            function: |objs| {
+                if objs.len() != 1 {
+                    return new_error(format!(
+                        "wrong number of arguments: expected 1, found {}",
+                        objs.len()
+                    ));
+                }
+
+                match &objs[0] {
+                    Object::Array(array) => {
+                        if !array.elements.is_empty() {
+                            Object::Array(Array {
+                                elements: array.elements[1..].to_vec(),
+                            })
+                        } else {
+                            Object::Null
+                        }
+                    }
+                    _ => new_error(format!(
+                        "argument to 'rest' must be ARRAY, found {}",
+                        objs[0].get_type_str()
+                    )),
+                }
+            },
+        })),
+        str if &str == "push" => Some(Object::Builtin(Builtin {
+            function: |objs| {
+                if objs.len() != 2 {
+                    return new_error(format!(
+                        "wrong number of arguments: expected 2, found {}",
+                        objs.len()
+                    ));
+                }
+
+                match &objs[0] {
+                    Object::Array(array) => {
+                        let mut elements = array.elements.clone();
+                        elements.push(objs[1].clone());
+                        Object::Array(Array { elements })
+                    }
+                    _ => new_error(format!(
+                        "argument to 'push' must be ARRAY, found {}",
+                        objs[0].get_type_str()
+                    )),
+                }
+            },
+        })),
+        str if &str == "puts" => Some(Object::Builtin(Builtin {
+            function: |objs| {
+                for obj in objs.iter() {
+                    println!("{}", obj.inspect());
+                }
+
+                Object::Null
+            },
+        })),
+        _ => None,
     }
 }

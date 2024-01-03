@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::BTreeMap, fmt::Display};
 
 use crate::token::Token;
 
@@ -12,19 +12,23 @@ pub enum AstNode {
     Expression(Expression),
     IdentifierExpression(IdentifierExpression),
     IntegerExpression(IntegerExpression),
+    StringExpression(StringExpression),
     PrefixExpression(PrefixExpression),
     InfixExpression(InfixExpression),
     BooleanExpression(BooleanExpression),
     IfExpression(IfExpression),
     FnLiteralExpression(FnLiteralExpression),
+    ArrayLiteralExpression(ArrayLiteralExpression),
+    HashLiteralExpression(HashLiteralExpression),
     CallExpression(CallExpression),
+    IndexExpression(IndexExpression),
 }
 
 pub trait Node {
     fn to_string(&self) -> String;
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct Program(pub Vec<Statement>);
 
 impl std::ops::Deref for Program {
@@ -51,7 +55,7 @@ impl Display for Program {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -70,7 +74,7 @@ impl Node for Statement {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct LetStatement {
     pub name: IdentifierExpression,
     pub value: Expression,
@@ -89,7 +93,7 @@ impl Node for LetStatement {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct ReturnStatement {
     pub value: Expression,
 }
@@ -105,7 +109,7 @@ impl Node for ReturnStatement {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct ExpressionStatement {
     pub expr: Expression,
 }
@@ -116,7 +120,7 @@ impl Node for ExpressionStatement {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
@@ -131,16 +135,20 @@ impl Node for BlockStatement {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum Expression {
     Identifier(IdentifierExpression),
     Integer(IntegerExpression),
+    String(StringExpression),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
     Boolean(BooleanExpression),
     If(IfExpression),
     FnLiteral(FnLiteralExpression),
+    ArrayLiteral(ArrayLiteralExpression),
+    HashLiteral(HashLiteralExpression),
     Call(CallExpression),
+    Index(IndexExpression),
 }
 
 impl Node for Expression {
@@ -148,17 +156,21 @@ impl Node for Expression {
         match self {
             Expression::Identifier(expr) => expr.to_string(),
             Expression::Integer(expr) => expr.to_string(),
+            Expression::String(expr) => expr.to_string(),
             Expression::Prefix(expr) => expr.to_string(),
             Expression::Infix(expr) => expr.to_string(),
             Expression::Boolean(expr) => expr.to_string(),
             Expression::If(expr) => expr.to_string(),
             Expression::FnLiteral(expr) => expr.to_string(),
+            Expression::ArrayLiteral(expr) => expr.to_string(),
+            Expression::HashLiteral(expr) => expr.to_string(),
             Expression::Call(expr) => expr.to_string(),
+            Expression::Index(expr) => expr.to_string(),
         }
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct IdentifierExpression {
     pub value: String,
 }
@@ -169,7 +181,7 @@ impl Node for IdentifierExpression {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct IntegerExpression {
     pub value: i32,
 }
@@ -180,7 +192,18 @@ impl Node for IntegerExpression {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
+pub struct StringExpression {
+    pub value: String,
+}
+
+impl Node for StringExpression {
+    fn to_string(&self) -> String {
+        self.value.clone()
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct PrefixExpression {
     pub prefix: Token,
     pub expr: Box<Expression>,
@@ -198,7 +221,7 @@ impl Node for PrefixExpression {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct InfixExpression {
     pub operator: Token,
     pub lhs: Box<Expression>,
@@ -220,7 +243,7 @@ impl Node for InfixExpression {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct BooleanExpression {
     pub value: bool,
 }
@@ -231,7 +254,7 @@ impl Node for BooleanExpression {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct IfExpression {
     pub condition: Box<Expression>,
     pub consequence: BlockStatement,
@@ -254,7 +277,7 @@ impl Node for IfExpression {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct FnLiteralExpression {
     pub parameters: Vec<IdentifierExpression>,
     pub body: BlockStatement,
@@ -276,7 +299,47 @@ impl Node for FnLiteralExpression {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
+pub struct ArrayLiteralExpression {
+    pub elements: Vec<Expression>,
+}
+
+impl Node for ArrayLiteralExpression {
+    fn to_string(&self) -> String {
+        [
+            "[".to_string(),
+            self.elements
+                .iter()
+                .map(|stmt| stmt.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            "]".to_string(),
+        ]
+        .join("")
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
+pub struct HashLiteralExpression {
+    pub pairs: BTreeMap<Expression, Expression>,
+}
+
+impl Node for HashLiteralExpression {
+    fn to_string(&self) -> String {
+        [
+            "{".to_string(),
+            self.pairs
+                .iter()
+                .map(|(k, v)| [k.to_string(), v.to_string()].join(": "))
+                .collect::<Vec<String>>()
+                .join(", "),
+            "}".to_string(),
+        ]
+        .join("")
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct CallExpression {
     pub function: Box<Expression>,
     pub arguments: Vec<Expression>,
@@ -293,6 +356,25 @@ impl Node for CallExpression {
                 .collect::<Vec<String>>()
                 .join(", "),
             ")".to_string(),
+        ]
+        .join("")
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
+pub struct IndexExpression {
+    pub identifier: Box<Expression>,
+    pub index: Box<Expression>,
+}
+
+impl Node for IndexExpression {
+    fn to_string(&self) -> String {
+        [
+            "(".to_string(),
+            self.identifier.to_string(),
+            "[".to_string(),
+            self.index.to_string(),
+            "])".to_string(),
         ]
         .join("")
     }
