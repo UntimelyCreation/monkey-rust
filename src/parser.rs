@@ -29,25 +29,33 @@ type InfixParseFn = for<'a> fn(&'a mut Parser, Box<Expression>) -> Option<Expres
 
 #[derive(Debug)]
 enum ParseError {
-    ParseError(TokenType, TokenType),
-    PrefixParseFnError(TokenType),
+    Token(TokenType, TokenType),
+    PrefixParseFn(TokenType),
+    Expression(String),
 }
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::ParseError(expected, result) => {
+            ParseError::Token(expected, result) => {
                 write!(
                     f,
                     "parse error: expected {:?}, found {:?}",
                     expected, result
                 )
             }
-            ParseError::PrefixParseFnError(token_type) => {
+            ParseError::PrefixParseFn(token_type) => {
                 write!(
                     f,
                     "parse error: no prefix function found for {:?}",
                     token_type
+                )
+            }
+            ParseError::Expression(expr_type) => {
+                write!(
+                    f,
+                    "parse error: no valid expression found for {}",
+                    expr_type
                 )
             }
         }
@@ -160,26 +168,40 @@ impl Parser {
 
     fn parse_expression(&mut self, precedence: usize) -> Option<Expression> {
         match self.prefix_parse_fns.get(&self.curr_token.kind) {
-            Some(prefix_fn) => {
-                let mut lhs = prefix_fn(self);
-
-                while self.peek_token.kind != TokenType::Semicolon
-                    && precedence < self.peek_precedence()
-                {
-                    let infix_parse_fns = self.infix_parse_fns.clone();
-                    if let Some(infix_fn) = infix_parse_fns.get(&self.peek_token.kind) {
-                        self.next_token();
-                        lhs = infix_fn(self, Box::new(lhs.unwrap()));
-                    } else {
-                        return lhs;
+            Some(prefix_fn) => match prefix_fn(self) {
+                Some(mut lhs) => {
+                    while self.peek_token.kind != TokenType::Semicolon
+                        && precedence < self.peek_precedence()
+                    {
+                        let infix_parse_fns = self.infix_parse_fns.clone();
+                        if let Some(infix_fn) = infix_parse_fns.get(&self.peek_token.kind) {
+                            self.next_token();
+                            match infix_fn(self, Box::new(lhs.clone())) {
+                                Some(expr) => {
+                                    lhs = expr;
+                                }
+                                None => {
+                                    self.errors
+                                        .push(ParseError::Expression("operand".to_string()));
+                                    return None;
+                                }
+                            }
+                        } else {
+                            return Some(lhs);
+                        }
                     }
-                }
 
-                lhs
-            }
+                    Some(lhs)
+                }
+                None => {
+                    self.errors
+                        .push(ParseError::Expression("operand".to_string()));
+                    None
+                }
+            },
             None => {
                 self.errors
-                    .push(ParseError::PrefixParseFnError(self.curr_token.kind));
+                    .push(ParseError::PrefixParseFn(self.curr_token.kind));
                 None
             }
         }
@@ -197,28 +219,42 @@ impl Parser {
 
         self.next_token();
 
-        let value = self.parse_expression(LOWEST).unwrap();
+        match self.parse_expression(LOWEST) {
+            Some(value) => {
+                if self.peek_token.kind == TokenType::Semicolon {
+                    self.next_token();
+                }
 
-        if self.peek_token.kind == TokenType::Semicolon {
-            self.next_token();
+                Some(Statement::Let(LetStatement {
+                    name: IdentifierExpression { value: let_name },
+                    value,
+                }))
+            }
+            None => {
+                self.errors
+                    .push(ParseError::Expression("value".to_string()));
+                None
+            }
         }
-
-        Some(Statement::Let(LetStatement {
-            name: IdentifierExpression { value: let_name },
-            value,
-        }))
     }
 
     fn parse_return_statement(&mut self) -> Option<Statement> {
         self.next_token();
 
-        let value = self.parse_expression(LOWEST).unwrap();
+        match self.parse_expression(LOWEST) {
+            Some(value) => {
+                if self.peek_token.kind == TokenType::Semicolon {
+                    self.next_token();
+                }
 
-        if self.peek_token.kind == TokenType::Semicolon {
-            self.next_token();
+                Some(Statement::Return(ReturnStatement { value }))
+            }
+            None => {
+                self.errors
+                    .push(ParseError::Expression("return value".to_string()));
+                None
+            }
         }
-
-        Some(Statement::Return(ReturnStatement { value }))
     }
 
     fn parse_expression_statement(&mut self) -> Option<Statement> {
@@ -231,7 +267,7 @@ impl Parser {
         expression.map(|expr| Statement::Expression(ExpressionStatement { expr }))
     }
 
-    fn parse_block_statement(&mut self) -> Option<Statement> {
+    fn parse_block_statement(&mut self) -> Statement {
         let mut statements = Vec::new();
 
         self.next_token();
@@ -243,7 +279,7 @@ impl Parser {
             self.next_token();
         }
 
-        Some(Statement::Block(BlockStatement { statements }))
+        Statement::Block(BlockStatement { statements })
     }
 
     fn parse_identifier_expression(&mut self) -> Option<Expression> {
@@ -256,10 +292,8 @@ impl Parser {
         match self.curr_token.literal.parse() {
             Ok(int) => Some(Expression::Integer(IntegerExpression { value: int })),
             Err(_) => {
-                self.errors.push(ParseError::ParseError(
-                    TokenType::Integer,
-                    self.curr_token.kind,
-                ));
+                self.errors
+                    .push(ParseError::Token(TokenType::Integer, self.curr_token.kind));
                 None
             }
         }
@@ -268,26 +302,43 @@ impl Parser {
     fn parse_prefix_expression(&mut self) -> Option<Expression> {
         let prefix = self.curr_token.clone();
         self.next_token();
-        let expr = Box::new(self.parse_expression(PREFIX).unwrap());
-        Some(Expression::Prefix(PrefixExpression { prefix, expr }))
+        match self.parse_expression(PREFIX) {
+            Some(expr) => Some(Expression::Prefix(PrefixExpression {
+                prefix,
+                expr: Box::new(expr),
+            })),
+            None => {
+                self.errors
+                    .push(ParseError::Expression("prefix operand".to_string()));
+                None
+            }
+        }
     }
 
     fn parse_infix_expression(&mut self, lhs: Box<Expression>) -> Option<Expression> {
         let operator = self.curr_token.clone();
         let precedence = self.curr_precedence();
         self.next_token();
-        let rhs = Box::new(self.parse_expression(precedence).unwrap());
-        Some(Expression::Infix(InfixExpression { operator, lhs, rhs }))
+        match self.parse_expression(precedence) {
+            Some(rhs) => Some(Expression::Infix(InfixExpression {
+                operator,
+                lhs,
+                rhs: Box::new(rhs),
+            })),
+            None => {
+                self.errors
+                    .push(ParseError::Expression("infix operand".to_string()));
+                None
+            }
+        }
     }
 
     fn parse_boolean_expression(&mut self) -> Option<Expression> {
         match self.curr_token.literal.parse() {
             Ok(boolean) => Some(Expression::Boolean(BooleanExpression { value: boolean })),
             Err(_) => {
-                self.errors.push(ParseError::ParseError(
-                    TokenType::True,
-                    self.curr_token.kind,
-                ));
+                self.errors
+                    .push(ParseError::Token(TokenType::True, self.curr_token.kind));
                 None
             }
         }
@@ -308,45 +359,49 @@ impl Parser {
         };
 
         self.next_token();
-        let condition = Box::new(self.parse_expression(LOWEST).unwrap());
+        match self.parse_expression(LOWEST) {
+            Some(expr) => {
+                let condition = Box::new(expr);
 
-        if !self.expect_peek(TokenType::RParen) {
-            return None;
-        };
+                if !self.expect_peek(TokenType::RParen) {
+                    return None;
+                };
 
-        if !self.expect_peek(TokenType::LBrace) {
-            return None;
-        };
+                if !self.expect_peek(TokenType::LBrace) {
+                    return None;
+                };
 
-        // HACK: Disgusting enum coercion
-        let consequence = self
-            .parse_block_statement()
-            .map(|stmt| match stmt {
-                Statement::Block(block_stmt) => block_stmt,
-                _ => unreachable!(),
-            })
-            .unwrap();
+                let consequence = match self.parse_block_statement() {
+                    Statement::Block(block_stmt) => block_stmt,
+                    _ => unreachable!(),
+                };
 
-        let alternative = if self.peek_token.kind == TokenType::Else {
-            self.next_token();
-            if !self.expect_peek(TokenType::LBrace) {
-                return None;
+                let alternative = if self.peek_token.kind == TokenType::Else {
+                    self.next_token();
+                    if !self.expect_peek(TokenType::LBrace) {
+                        return None;
+                    }
+
+                    Some(match self.parse_block_statement() {
+                        Statement::Block(block_stmt) => block_stmt,
+                        _ => unreachable!(),
+                    })
+                } else {
+                    None
+                };
+
+                Some(Expression::If(IfExpression {
+                    condition,
+                    consequence,
+                    alternative,
+                }))
             }
-
-            // HACK: Same here
-            self.parse_block_statement().map(|stmt| match stmt {
-                Statement::Block(block_stmt) => block_stmt,
-                _ => unreachable!(),
-            })
-        } else {
-            None
-        };
-
-        Some(Expression::If(IfExpression {
-            condition,
-            consequence,
-            alternative,
-        }))
+            None => {
+                self.errors
+                    .push(ParseError::Expression("condition".to_string()));
+                None
+            }
+        }
     }
 
     fn parse_fn_literal_expression(&mut self) -> Option<Expression> {
@@ -360,13 +415,10 @@ impl Parser {
             return None;
         };
 
-        let body = self
-            .parse_block_statement()
-            .map(|stmt| match stmt {
-                Statement::Block(block_stmt) => block_stmt,
-                _ => unreachable!(),
-            })
-            .unwrap();
+        let body = match self.parse_block_statement() {
+            Statement::Block(block_stmt) => block_stmt,
+            _ => unreachable!(),
+        };
 
         Some(Expression::FnLiteral(FnLiteralExpression {
             parameters,
@@ -454,16 +506,23 @@ impl Parser {
 
     fn parse_index_expression(&mut self, lhs: Box<Expression>) -> Option<Expression> {
         self.next_token();
-        let index = Box::new(self.parse_expression(LOWEST).unwrap());
+        match self.parse_expression(LOWEST) {
+            Some(index) => {
+                if !self.expect_peek(TokenType::RBracket) {
+                    return None;
+                };
 
-        if !self.expect_peek(TokenType::RBracket) {
-            return None;
-        };
-
-        Some(Expression::Index(IndexExpression {
-            identifier: lhs,
-            index,
-        }))
+                Some(Expression::Index(IndexExpression {
+                    identifier: lhs,
+                    index: Box::new(index),
+                }))
+            }
+            None => {
+                self.errors
+                    .push(ParseError::Expression("index".to_string()));
+                None
+            }
+        }
     }
 
     fn parse_hash_literal_expression(&mut self) -> Option<Expression> {
@@ -471,19 +530,35 @@ impl Parser {
 
         while self.peek_token.kind != TokenType::RBrace {
             self.next_token();
-            let key = self.parse_expression(LOWEST).unwrap();
+            match self.parse_expression(LOWEST) {
+                Some(key) => {
+                    if !self.expect_peek(TokenType::Colon) {
+                        return None;
+                    }
 
-            if !self.expect_peek(TokenType::Colon) {
-                return None;
-            }
+                    self.next_token();
+                    match self.parse_expression(LOWEST) {
+                        Some(value) => {
+                            pairs.insert(key, value);
 
-            self.next_token();
-            let value = self.parse_expression(LOWEST).unwrap();
-
-            pairs.insert(key, value);
-
-            if self.peek_token.kind != TokenType::RBrace && !self.expect_peek(TokenType::Comma) {
-                return None;
+                            if self.peek_token.kind != TokenType::RBrace
+                                && !self.expect_peek(TokenType::Comma)
+                            {
+                                return None;
+                            }
+                        }
+                        None => {
+                            self.errors
+                                .push(ParseError::Expression("hash value".to_string()));
+                            return None;
+                        }
+                    }
+                }
+                None => {
+                    self.errors
+                        .push(ParseError::Expression("hash key".to_string()));
+                    return None;
+                }
             }
         }
 
@@ -507,7 +582,7 @@ impl Parser {
             }
             _ => {
                 self.errors
-                    .push(ParseError::ParseError(expected, self.peek_token.kind));
+                    .push(ParseError::Token(expected, self.peek_token.kind));
                 false
             }
         }

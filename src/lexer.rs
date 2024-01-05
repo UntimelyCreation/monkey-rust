@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::token::{match_identifier, Token, TokenType};
 
 pub struct Lexer {
@@ -12,7 +10,7 @@ pub struct Lexer {
 impl Lexer {
     pub fn new(input: &str) -> Self {
         let mut lexer = Lexer {
-            input: String::from_str(input).unwrap(),
+            input: input.to_string(),
             position: 0,
             read_position: 0,
             character: '\0',
@@ -79,7 +77,7 @@ impl Lexer {
                     self.read_char();
                 }
                 skip_read_char = true;
-                match_identifier(self.input.get(position..self.position).unwrap())
+                match_identifier(&self.input[position..self.position])
             }
             ch if ch.is_ascii_digit() => {
                 let position = self.position;
@@ -87,10 +85,7 @@ impl Lexer {
                     self.read_char();
                 }
                 skip_read_char = true;
-                Token::from_str(
-                    TokenType::Integer,
-                    self.input.get(position..self.position).unwrap(),
-                )
+                Token::from_str(TokenType::Integer, &self.input[position..self.position])
             }
             _ => Token::from_char(TokenType::Unknown, '\0'),
         };
@@ -113,21 +108,13 @@ impl Lexer {
     }
 
     fn read_char(&mut self) {
-        if self.read_position >= self.input.chars().count() {
-            self.character = '\0';
-        } else {
-            self.character = self.input.chars().nth(self.read_position).unwrap();
-        }
+        self.character = self.peek_char();
         self.position = self.read_position;
         self.read_position += 1;
     }
 
     fn peek_char(&self) -> char {
-        if self.read_position >= self.input.chars().count() {
-            '\0'
-        } else {
-            self.input.chars().nth(self.read_position).unwrap()
-        }
+        self.input.chars().nth(self.read_position).unwrap_or('\0')
     }
 
     fn skip_whitespace(&mut self) {

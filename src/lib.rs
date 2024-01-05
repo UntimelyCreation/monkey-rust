@@ -178,7 +178,9 @@ let foobar = y;";
                 }),
             }),
         ];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -205,7 +207,9 @@ return x;";
                 }),
             }),
         ];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -222,7 +226,9 @@ return x;";
                 value: String::from("foobar"),
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -237,7 +243,9 @@ return x;";
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Integer(IntegerExpression { value: 5 }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -254,7 +262,9 @@ return x;";
                 value: "hello world".to_string(),
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -275,7 +285,9 @@ return x;";
                 expr: Box::new(Expression::Integer(IntegerExpression { value: 5 })),
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -296,7 +308,9 @@ return x;";
                 expr: Box::new(Expression::Integer(IntegerExpression { value: 12 })),
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -334,7 +348,9 @@ return x;";
                     rhs: Box::new(Expression::Integer(IntegerExpression { value: 6 })),
                 }),
             })];
-            let parsed_input = parser.parse_program().unwrap();
+            let parsed_input = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             assert_eq!(*parsed_input, expected);
             //assert_eq!(parsed_input.to_string(), input.to_string());
         }
@@ -383,7 +399,9 @@ return x;";
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
 
-            let parsed_input = parser.parse_program().unwrap();
+            let parsed_input = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             assert_eq!(parsed_input.to_string(), expected_strings[i].to_string());
         }
     }
@@ -403,7 +421,9 @@ return x;";
             let expected = vec![Statement::Expression(ExpressionStatement {
                 expr: Expression::Boolean(expected_values[i].clone()),
             })];
-            let parsed_input = parser.parse_program().unwrap();
+            let parsed_input = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             assert_eq!(*parsed_input, expected);
             //assert_eq!(parsed_input.to_string(), input.to_string());
         }
@@ -440,7 +460,9 @@ return x;";
                 alternative: None,
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -482,7 +504,9 @@ return x;";
                 }),
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -522,7 +546,9 @@ return x;";
                 },
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -555,7 +581,9 @@ return x;";
                     body: BlockStatement { statements: vec![] },
                 }),
             })];
-            let parsed_input = parser.parse_program().unwrap();
+            let parsed_input = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             assert_eq!(*parsed_input, expected);
             //assert_eq!(parsed_input.to_string(), input.to_string());
         }
@@ -594,7 +622,9 @@ return x;";
                 ],
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -629,7 +659,9 @@ return x;";
                 ],
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -669,7 +701,9 @@ return x;";
                 pairs: expected_map,
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -686,7 +720,9 @@ return x;";
                 pairs: BTreeMap::new(),
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -713,7 +749,9 @@ return x;";
                 })),
             }),
         })];
-        let parsed_input = parser.parse_program().unwrap();
+        let parsed_input = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         assert_eq!(*parsed_input, expected);
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
@@ -743,9 +781,12 @@ return x;";
                 value: expected_values[i],
             });
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -784,9 +825,12 @@ return x;";
                 value: expected_values[i],
             });
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -806,9 +850,12 @@ return x;";
                 value: expected_values[i].to_string(),
             });
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -828,9 +875,12 @@ return x;";
                 value: expected_values[i],
             });
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -860,9 +910,12 @@ return x;";
 
             let expected = expected_values[i].clone();
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -888,9 +941,12 @@ return x;";
                 value: expected_values[i],
             });
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -928,9 +984,12 @@ return x;";
                 message: expected_values[i].to_string(),
             });
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -955,9 +1014,12 @@ return x;";
                 value: expected_values[i],
             });
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -984,9 +1046,12 @@ return x;";
                 value: expected_values[i],
             });
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -1066,9 +1131,12 @@ return x;";
 
             let expected = expected_values[i].clone();
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -1090,9 +1158,12 @@ return x;";
             ],
         });
 
-        let program = parser.parse_program().unwrap();
+        let program = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         println!("{program:?}");
-        let eval_input = eval(AstNode::Program(program), env).unwrap();
+        let eval_input =
+            eval(AstNode::Program(program), env).expect("error occurred while evaluating program");
 
         assert_eq!(eval_input, expected);
     }
@@ -1118,7 +1189,9 @@ return x;";
             value: "one".to_string(),
         });
         expected_pairs.insert(
-            key_one.get_hash_key().unwrap(),
+            key_one
+                .get_hash_key()
+                .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_one,
                 value: Object::Integer(Integer { value: 1 }),
@@ -1128,7 +1201,9 @@ return x;";
             value: "two".to_string(),
         });
         expected_pairs.insert(
-            key_two.get_hash_key().unwrap(),
+            key_two
+                .get_hash_key()
+                .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_two,
                 value: Object::Integer(Integer { value: 2 }),
@@ -1138,7 +1213,9 @@ return x;";
             value: "three".to_string(),
         });
         expected_pairs.insert(
-            key_three.get_hash_key().unwrap(),
+            key_three
+                .get_hash_key()
+                .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_three,
                 value: Object::Integer(Integer { value: 3 }),
@@ -1146,7 +1223,9 @@ return x;";
         );
         let key_four = Object::Integer(Integer { value: 4 });
         expected_pairs.insert(
-            key_four.get_hash_key().unwrap(),
+            key_four
+                .get_hash_key()
+                .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_four.clone(),
                 value: key_four,
@@ -1154,7 +1233,9 @@ return x;";
         );
         let key_five = Object::Boolean(Boolean { value: true });
         expected_pairs.insert(
-            key_five.get_hash_key().unwrap(),
+            key_five
+                .get_hash_key()
+                .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_five,
                 value: Object::Integer(Integer { value: 5 }),
@@ -1162,7 +1243,9 @@ return x;";
         );
         let key_six = Object::Boolean(Boolean { value: false });
         expected_pairs.insert(
-            key_six.get_hash_key().unwrap(),
+            key_six
+                .get_hash_key()
+                .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_six,
                 value: Object::Integer(Integer { value: 6 }),
@@ -1172,9 +1255,12 @@ return x;";
         let expected = Object::Hash(HashObj {
             pairs: expected_pairs,
         });
-        let program = parser.parse_program().unwrap();
+        let program = parser
+            .parse_program()
+            .expect("error occurred while parsing program");
         println!("{program:?}");
-        let eval_input = eval(AstNode::Program(program), env).unwrap();
+        let eval_input =
+            eval(AstNode::Program(program), env).expect("error occurred while evaluating program");
 
         assert_eq!(eval_input, expected);
     }
@@ -1211,9 +1297,12 @@ return x;";
 
             let expected = expected_values[i].clone();
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -1247,9 +1336,12 @@ return x;";
 
             let expected = expected_values[i].clone();
 
-            let program = parser.parse_program().unwrap();
+            let program = parser
+                .parse_program()
+                .expect("error occurred while parsing program");
             println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env).unwrap();
+            let eval_input = eval(AstNode::Program(program), env)
+                .expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }

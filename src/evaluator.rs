@@ -521,13 +521,7 @@ fn get_builtin_fn(name: String) -> Option<Object> {
                 }
 
                 match &objs[0] {
-                    Object::Array(array) => {
-                        if !array.elements.is_empty() {
-                            array.elements.last().unwrap().clone()
-                        } else {
-                            Object::Null
-                        }
-                    }
+                    Object::Array(array) => array.elements.last().unwrap_or(&Object::Null).clone(),
                     _ => new_error(format!(
                         "argument to 'last' must be ARRAY, found {}",
                         objs[0].get_type_str()
