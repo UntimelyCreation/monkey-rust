@@ -75,7 +75,7 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
             if let Some(rhs) = eval(AstNode::Expression(*expr.expr), env) {
                 match rhs {
                     Object::Error(_) => Some(rhs),
-                    _ => eval_prefix_expression(expr.prefix.literal, rhs),
+                    _ => eval_prefix_expression(expr.prefix.get_literal(), rhs),
                 }
             } else {
                 None
@@ -89,7 +89,7 @@ pub fn eval(node: AstNode, env: Rc<RefCell<Environment>>) -> Option<Object> {
                         if let Some(rhs) = eval(AstNode::Expression(*expr.rhs), env) {
                             match rhs {
                                 Object::Error(_) => Some(lhs),
-                                _ => eval_infix_expression(expr.operator.literal, lhs, rhs),
+                                _ => eval_infix_expression(expr.operator.get_literal(), lhs, rhs),
                             }
                         } else {
                             None

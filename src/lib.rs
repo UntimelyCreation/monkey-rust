@@ -25,7 +25,7 @@ mod tests {
             Array, Boolean, Environment, Error, HashObj, HashPair, Integer, Object, StringObj,
         },
         parser::Parser,
-        token::{Token, TokenType},
+        token::Token,
     };
 
     #[test]
@@ -56,93 +56,93 @@ mod tests {
 
         let lexer = Lexer::new(input);
         let expected = vec![
-            Token::from_str(TokenType::Let, "let"),
-            Token::from_str(TokenType::Identifier, "five"),
-            Token::from_char(TokenType::Assign, '='),
-            Token::from_str(TokenType::Integer, "5"),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_str(TokenType::Let, "let"),
-            Token::from_str(TokenType::Identifier, "ten"),
-            Token::from_char(TokenType::Assign, '='),
-            Token::from_str(TokenType::Integer, "10"),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_str(TokenType::Let, "let"),
-            Token::from_str(TokenType::Identifier, "add"),
-            Token::from_char(TokenType::Assign, '='),
-            Token::from_str(TokenType::Function, "fn"),
-            Token::from_char(TokenType::LParen, '('),
-            Token::from_str(TokenType::Identifier, "x"),
-            Token::from_char(TokenType::Comma, ','),
-            Token::from_str(TokenType::Identifier, "y"),
-            Token::from_char(TokenType::RParen, ')'),
-            Token::from_char(TokenType::LBrace, '{'),
-            Token::from_str(TokenType::Identifier, "x"),
-            Token::from_char(TokenType::Plus, '+'),
-            Token::from_str(TokenType::Identifier, "y"),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_char(TokenType::RBrace, '}'),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_str(TokenType::Let, "let"),
-            Token::from_str(TokenType::Identifier, "result"),
-            Token::from_char(TokenType::Assign, '='),
-            Token::from_str(TokenType::Identifier, "add"),
-            Token::from_char(TokenType::LParen, '('),
-            Token::from_str(TokenType::Identifier, "five"),
-            Token::from_char(TokenType::Comma, ','),
-            Token::from_str(TokenType::Identifier, "ten"),
-            Token::from_char(TokenType::RParen, ')'),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_char(TokenType::Bang, '!'),
-            Token::from_char(TokenType::Asterisk, '*'),
-            Token::from_char(TokenType::Minus, '-'),
-            Token::from_char(TokenType::Slash, '/'),
-            Token::from_str(TokenType::Integer, "5"),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_str(TokenType::Integer, "5"),
-            Token::from_char(TokenType::LessThan, '<'),
-            Token::from_str(TokenType::Integer, "10"),
-            Token::from_char(TokenType::GreaterThan, '>'),
-            Token::from_str(TokenType::Integer, "5"),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_str(TokenType::If, "if"),
-            Token::from_char(TokenType::LParen, '('),
-            Token::from_str(TokenType::Integer, "5"),
-            Token::from_char(TokenType::LessThan, '<'),
-            Token::from_str(TokenType::Integer, "10"),
-            Token::from_char(TokenType::RParen, ')'),
-            Token::from_char(TokenType::LBrace, '{'),
-            Token::from_str(TokenType::Return, "return"),
-            Token::from_str(TokenType::True, "true"),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_char(TokenType::RBrace, '}'),
-            Token::from_str(TokenType::Else, "else"),
-            Token::from_char(TokenType::LBrace, '{'),
-            Token::from_str(TokenType::Return, "return"),
-            Token::from_str(TokenType::False, "false"),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_char(TokenType::RBrace, '}'),
-            Token::from_str(TokenType::Integer, "10"),
-            Token::from_str(TokenType::Equal, "=="),
-            Token::from_str(TokenType::Integer, "10"),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_str(TokenType::Integer, "10"),
-            Token::from_str(TokenType::NotEqual, "!="),
-            Token::from_str(TokenType::Integer, "9"),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_str(TokenType::String, "foobar"),
-            Token::from_str(TokenType::String, "foo bar"),
-            Token::from_char(TokenType::LBracket, '['),
-            Token::from_str(TokenType::Integer, "1"),
-            Token::from_char(TokenType::Comma, ','),
-            Token::from_str(TokenType::Integer, "2"),
-            Token::from_char(TokenType::RBracket, ']'),
-            Token::from_char(TokenType::LBrace, '{'),
-            Token::from_str(TokenType::String, "foo"),
-            Token::from_char(TokenType::Colon, ':'),
-            Token::from_str(TokenType::String, "bar"),
-            Token::from_char(TokenType::RBrace, '}'),
-            Token::from_char(TokenType::Semicolon, ';'),
-            Token::from_char(TokenType::Eof, '\0'),
+            Token::Let,
+            Token::Identifier("five".to_string()),
+            Token::Assign,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::Let,
+            Token::Identifier("ten".to_string()),
+            Token::Assign,
+            Token::Integer(10),
+            Token::Semicolon,
+            Token::Let,
+            Token::Identifier("add".to_string()),
+            Token::Assign,
+            Token::Function,
+            Token::LParen,
+            Token::Identifier("x".to_string()),
+            Token::Comma,
+            Token::Identifier("y".to_string()),
+            Token::RParen,
+            Token::LBrace,
+            Token::Identifier("x".to_string()),
+            Token::Plus,
+            Token::Identifier("y".to_string()),
+            Token::Semicolon,
+            Token::RBrace,
+            Token::Semicolon,
+            Token::Let,
+            Token::Identifier("result".to_string()),
+            Token::Assign,
+            Token::Identifier("add".to_string()),
+            Token::LParen,
+            Token::Identifier("five".to_string()),
+            Token::Comma,
+            Token::Identifier("ten".to_string()),
+            Token::RParen,
+            Token::Semicolon,
+            Token::Bang,
+            Token::Asterisk,
+            Token::Minus,
+            Token::Slash,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::Integer(5),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::GreaterThan,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::If,
+            Token::LParen,
+            Token::Integer(5),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::RParen,
+            Token::LBrace,
+            Token::Return,
+            Token::Boolean(true),
+            Token::Semicolon,
+            Token::RBrace,
+            Token::Else,
+            Token::LBrace,
+            Token::Return,
+            Token::Boolean(false),
+            Token::Semicolon,
+            Token::RBrace,
+            Token::Integer(10),
+            Token::Equal,
+            Token::Integer(10),
+            Token::Semicolon,
+            Token::Integer(10),
+            Token::NotEqual,
+            Token::Integer(9),
+            Token::Semicolon,
+            Token::String("foobar".to_string()),
+            Token::String("foo bar".to_string()),
+            Token::LBracket,
+            Token::Integer(1),
+            Token::Comma,
+            Token::Integer(2),
+            Token::RBracket,
+            Token::LBrace,
+            Token::String("foo".to_string()),
+            Token::Colon,
+            Token::String("bar".to_string()),
+            Token::RBrace,
+            Token::Semicolon,
+            Token::Eof,
         ];
         assert_eq!(lexer.tokenize(), expected);
     }
@@ -278,10 +278,7 @@ return x;";
 
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Prefix(PrefixExpression {
-                prefix: Token {
-                    kind: TokenType::Bang,
-                    literal: '!'.to_string(),
-                },
+                prefix: Token::Bang,
                 expr: Box::new(Expression::Integer(IntegerExpression { value: 5 })),
             }),
         })];
@@ -301,10 +298,7 @@ return x;";
 
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Prefix(PrefixExpression {
-                prefix: Token {
-                    kind: TokenType::Minus,
-                    literal: '-'.to_string(),
-                },
+                prefix: Token::Minus,
                 expr: Box::new(Expression::Integer(IntegerExpression { value: 12 })),
             }),
         })];
@@ -318,24 +312,7 @@ return x;";
     #[test]
     fn test_parse_infix_expressions() {
         let inputs = ["5 + 6;", "5 - 6;", "5 == 6;", "5 != 6;"];
-        let expected_operators = [
-            Token {
-                kind: TokenType::Plus,
-                literal: '+'.to_string(),
-            },
-            Token {
-                kind: TokenType::Minus,
-                literal: '-'.to_string(),
-            },
-            Token {
-                kind: TokenType::Equal,
-                literal: "==".to_string(),
-            },
-            Token {
-                kind: TokenType::NotEqual,
-                literal: "!=".to_string(),
-            },
-        ];
+        let expected_operators = [Token::Plus, Token::Minus, Token::Equal, Token::NotEqual];
 
         for (i, input) in inputs.iter().enumerate() {
             let lexer = Lexer::new(input);
@@ -439,10 +416,7 @@ return x;";
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::If(IfExpression {
                 condition: Box::new(Expression::Infix(InfixExpression {
-                    operator: Token {
-                        kind: TokenType::GreaterThan,
-                        literal: '>'.to_string(),
-                    },
+                    operator: Token::GreaterThan,
                     lhs: Box::new(Expression::Identifier(IdentifierExpression {
                         value: "x".to_string(),
                     })),
@@ -477,10 +451,7 @@ return x;";
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::If(IfExpression {
                 condition: Box::new(Expression::Infix(InfixExpression {
-                    operator: Token {
-                        kind: TokenType::GreaterThan,
-                        literal: '>'.to_string(),
-                    },
+                    operator: Token::GreaterThan,
                     lhs: Box::new(Expression::Identifier(IdentifierExpression {
                         value: "x".to_string(),
                     })),
@@ -531,10 +502,7 @@ return x;";
                 body: BlockStatement {
                     statements: vec![Statement::Expression(ExpressionStatement {
                         expr: Expression::Infix(InfixExpression {
-                            operator: Token {
-                                kind: TokenType::Plus,
-                                literal: '+'.to_string(),
-                            },
+                            operator: Token::Plus,
                             lhs: Box::new(Expression::Identifier(IdentifierExpression {
                                 value: "x".to_string(),
                             })),
@@ -604,18 +572,12 @@ return x;";
                 arguments: vec![
                     Expression::Integer(IntegerExpression { value: 1 }),
                     Expression::Infix(InfixExpression {
-                        operator: Token {
-                            kind: TokenType::Asterisk,
-                            literal: '*'.to_string(),
-                        },
+                        operator: Token::Asterisk,
                         lhs: Box::new(Expression::Integer(IntegerExpression { value: 2 })),
                         rhs: Box::new(Expression::Integer(IntegerExpression { value: 3 })),
                     }),
                     Expression::Infix(InfixExpression {
-                        operator: Token {
-                            kind: TokenType::Plus,
-                            literal: '+'.to_string(),
-                        },
+                        operator: Token::Plus,
                         lhs: Box::new(Expression::Integer(IntegerExpression { value: 4 })),
                         rhs: Box::new(Expression::Integer(IntegerExpression { value: 5 })),
                     }),
@@ -641,18 +603,12 @@ return x;";
                 elements: vec![
                     Expression::Integer(IntegerExpression { value: 1 }),
                     Expression::Infix(InfixExpression {
-                        operator: Token {
-                            kind: TokenType::Asterisk,
-                            literal: '*'.to_string(),
-                        },
+                        operator: Token::Asterisk,
                         lhs: Box::new(Expression::Integer(IntegerExpression { value: 2 })),
                         rhs: Box::new(Expression::Integer(IntegerExpression { value: 2 })),
                     }),
                     Expression::Infix(InfixExpression {
-                        operator: Token {
-                            kind: TokenType::Plus,
-                            literal: '+'.to_string(),
-                        },
+                        operator: Token::Plus,
                         lhs: Box::new(Expression::Integer(IntegerExpression { value: 3 })),
                         rhs: Box::new(Expression::Integer(IntegerExpression { value: 3 })),
                     }),
@@ -687,10 +643,7 @@ return x;";
         expected_map.insert(
             Expression::Integer(IntegerExpression { value: 3 }),
             Expression::Infix(InfixExpression {
-                operator: Token {
-                    kind: TokenType::Slash,
-                    literal: '/'.to_string(),
-                },
+                operator: Token::Slash,
                 lhs: Box::new(Expression::Integer(IntegerExpression { value: 16 })),
                 rhs: Box::new(Expression::Integer(IntegerExpression { value: 4 })),
             }),
@@ -740,10 +693,7 @@ return x;";
                     value: "myArray".to_string(),
                 })),
                 index: Box::new(Expression::Infix(InfixExpression {
-                    operator: Token {
-                        kind: TokenType::Plus,
-                        literal: '+'.to_string(),
-                    },
+                    operator: Token::Plus,
                     lhs: Box::new(Expression::Integer(IntegerExpression { value: 1 })),
                     rhs: Box::new(Expression::Integer(IntegerExpression { value: 1 })),
                 })),

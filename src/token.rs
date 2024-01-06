@@ -1,34 +1,13 @@
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
-pub struct Token {
-    pub kind: TokenType,
-    pub literal: String,
-}
-
-impl Token {
-    pub fn from_char(kind: TokenType, ch: char) -> Self {
-        Token {
-            kind,
-            literal: String::from(ch),
-        }
-    }
-
-    pub fn from_str(kind: TokenType, literal: &str) -> Self {
-        Token {
-            kind,
-            literal: literal.to_string(),
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Copy, Clone)]
-pub enum TokenType {
+pub enum Token {
     Unknown,
     Eof,
 
     // Identifiers
-    Identifier,
-    Integer,
-    String,
+    Identifier(String),
+    Integer(i32),
+    Boolean(bool),
+    String(String),
 
     // Operators
     Assign,
@@ -59,22 +38,57 @@ pub enum TokenType {
     // Keywords
     Let,
     Function,
-    True,
-    False,
     If,
     Else,
     Return,
 }
 
+impl Token {
+    pub fn get_literal(&self) -> String {
+        match self {
+            Self::Identifier(identifier) => identifier.to_owned(),
+            Self::Integer(integer) => integer.to_string(),
+            Self::Boolean(boolean) => boolean.to_string(),
+            Self::String(string) => string.to_owned(),
+            Self::Assign => '='.to_string(),
+            Self::Plus => '+'.to_string(),
+            Self::Minus => '-'.to_string(),
+            Self::Bang => '!'.to_string(),
+            Self::Asterisk => '*'.to_string(),
+            Self::Slash => '/'.to_string(),
+            Self::LessThan => '<'.to_string(),
+            Self::GreaterThan => '>'.to_string(),
+            Self::Equal => "==".to_string(),
+            Self::NotEqual => "!=".to_string(),
+            Self::Comma => ','.to_string(),
+            Self::Semicolon => ';'.to_string(),
+            Self::Colon => ':'.to_string(),
+            Self::LParen => '('.to_string(),
+            Self::RParen => ')'.to_string(),
+            Self::LBrace => '{'.to_string(),
+            Self::RBrace => '}'.to_string(),
+            Self::LBracket => '['.to_string(),
+            Self::RBracket => ']'.to_string(),
+            Self::Let => "let".to_string(),
+            Self::Function => "fn".to_string(),
+            Self::If => "if".to_string(),
+            Self::Else => "else".to_string(),
+            Self::Return => "return".to_string(),
+            Self::Eof => "Eof".to_string(),
+            _ => '\0'.to_string(),
+        }
+    }
+}
+
 pub fn match_identifier(identifier: &str) -> Token {
     match identifier {
-        "let" => Token::from_str(TokenType::Let, identifier),
-        "fn" => Token::from_str(TokenType::Function, identifier),
-        "true" => Token::from_str(TokenType::True, identifier),
-        "false" => Token::from_str(TokenType::False, identifier),
-        "if" => Token::from_str(TokenType::If, identifier),
-        "else" => Token::from_str(TokenType::Else, identifier),
-        "return" => Token::from_str(TokenType::Return, identifier),
-        _ => Token::from_str(TokenType::Identifier, identifier),
+        "let" => Token::Let,
+        "fn" => Token::Function,
+        "true" => Token::Boolean(true),
+        "false" => Token::Boolean(false),
+        "if" => Token::If,
+        "else" => Token::Else,
+        "return" => Token::Return,
+        _ => Token::Identifier(identifier.to_string()),
     }
 }

@@ -213,7 +213,7 @@ impl Node for PrefixExpression {
     fn to_string(&self) -> String {
         [
             "(".to_string(),
-            self.prefix.literal.clone(),
+            self.prefix.get_literal(),
             self.expr.to_string(),
             ")".to_string(),
         ]
@@ -234,7 +234,7 @@ impl Node for InfixExpression {
             "(".to_string(),
             self.lhs.to_string(),
             " ".to_string(),
-            self.operator.literal.clone(),
+            self.operator.get_literal(),
             " ".to_string(),
             self.rhs.to_string(),
             ")".to_string(),
