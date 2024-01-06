@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct Token {
     pub kind: TokenType,
@@ -17,7 +15,7 @@ impl Token {
     pub fn from_str(kind: TokenType, literal: &str) -> Self {
         Token {
             kind,
-            literal: String::from_str(literal).unwrap(),
+            literal: literal.to_string(),
         }
     }
 }
