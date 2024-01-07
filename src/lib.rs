@@ -648,7 +648,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -685,7 +685,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -703,7 +703,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -721,7 +721,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -751,7 +751,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -775,7 +775,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -811,7 +811,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -834,7 +834,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -859,7 +859,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -921,7 +921,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -941,7 +941,7 @@ return x;";
 
         let program = parse(input).expect("error occurred while parsing program");
         println!("{program}");
-        let eval_input = eval(program, env).expect("error occurred while evaluating program");
+        let eval_input = eval(program, env);
 
         assert_eq!(eval_input, expected);
     }
@@ -1026,7 +1026,7 @@ return x;";
 
         let program = parse(input).expect("error occurred while parsing program");
         println!("{program}");
-        let eval_input = eval(program, env).expect("error occurred while evaluating program");
+        let eval_input = eval(program, env);
 
         assert_eq!(eval_input, expected);
     }
@@ -1063,7 +1063,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }
@@ -1097,7 +1097,7 @@ return x;";
 
             let program = parse(input).expect("error occurred while parsing program");
             println!("{program}");
-            let eval_input = eval(program, env).expect("error occurred while evaluating program");
+            let eval_input = eval(program, env);
 
             assert_eq!(eval_input, expected);
         }

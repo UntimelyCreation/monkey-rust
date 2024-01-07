@@ -4,7 +4,11 @@ use std::{
     rc::Rc,
 };
 
-use crate::{evaluator::eval, object::Environment, parser::parse};
+use crate::{
+    evaluator::eval,
+    object::Environment,
+    parser::{eprint_parse_errors, parse},
+};
 
 const PROMPT: &str = ">> ";
 
@@ -17,16 +21,16 @@ pub fn start_repl() {
         print!("{}", PROMPT);
         match io::stdout().flush() {
             Ok(_) => match io::stdin().read_line(&mut input) {
-                Ok(_) => {
-                    if let Some(program) = parse(&input) {
-                        if let Some(evaluated) = eval(program, env.clone()) {
-                            println!("{}", evaluated);
-                        }
+                Ok(_) => match parse(&input) {
+                    Ok(program) => {
+                        let evaluated = eval(program, env.clone());
+                        println!("{}", evaluated);
                     }
-                }
-                Err(error) => println!("ERROR: {error}"),
+                    Err(errs) => eprint_parse_errors(&errs),
+                },
+                Err(error) => eprintln!("ERROR: {error}"),
             },
-            Err(error) => println!("ERROR: {error}"),
+            Err(error) => eprintln!("ERROR: {error}"),
         };
     }
 }

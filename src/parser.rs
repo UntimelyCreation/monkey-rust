@@ -1,17 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::ast::{
-    ArrayLiteralExpression, HashLiteralExpression, IndexExpression, Node, StringExpression,
-};
-use crate::{
-    ast::{
-        BlockStatement, BooleanExpression, CallExpression, Expression, ExpressionStatement,
-        FnLiteralExpression, IdentifierExpression, IfExpression, InfixExpression,
-        IntegerExpression, LetStatement, PrefixExpression, Program, ReturnStatement, Statement,
-    },
-    lexer::Lexer,
-    token::Token,
-};
+use crate::{ast::*, lexer::Lexer, token::Token};
 
 const LOWEST: usize = 1;
 const EQUALS: usize = 2;
@@ -34,8 +23,8 @@ fn get_precedence(token: &Token) -> usize {
     }
 }
 
-type PrefixParseFn = for<'a> fn(&'a mut Parser) -> Option<Expression>;
-type InfixParseFn = for<'a> fn(&'a mut Parser, Box<Expression>) -> Option<Expression>;
+type PrefixParseFn = for<'a> fn(&'a mut Parser) -> Result<Expression, ParseError>;
+type InfixParseFn = for<'a> fn(&'a mut Parser, Box<Expression>) -> Result<Expression, ParseError>;
 
 fn get_prefix_fn(token: &Token) -> Option<PrefixParseFn> {
     match token {
@@ -71,20 +60,23 @@ fn get_infix_fn(token: &Token) -> Option<InfixParseFn> {
 }
 
 type ParseError = String;
+type ParseErrors = Vec<ParseError>;
+
+pub fn eprint_parse_errors(errs: &ParseErrors) {
+    for err in errs.iter() {
+        eprintln!("parse error: {}", err);
+    }
+}
 
 fn fmt_token_error(expected: &Token, result: &Token) -> ParseError {
     format!(
-        "parse error: expected {}, found {}",
+        "expected {}, found {}",
         expected.get_literal(),
         result.get_literal()
     )
 }
 
-fn fmt_expression_error(expr: &str) -> ParseError {
-    format!("parse error: no valid expression found for {}", expr)
-}
-
-pub fn parse(input: &str) -> Option<Node> {
+pub fn parse(input: &str) -> Result<Node, ParseErrors> {
     let lexer = Lexer::new(input);
     let mut parser = Parser::new(lexer);
     parser.parse_program().map(Node::Program)
@@ -112,31 +104,25 @@ impl Parser {
         parser
     }
 
-    pub fn parse_program(&mut self) -> Option<Program> {
+    pub fn parse_program(&mut self) -> Result<Program, ParseErrors> {
         let mut program: Program = Program(Vec::new());
 
         while self.curr_token != Token::Eof {
-            if let Some(stmt) = self.parse_statement() {
-                program.0.push(stmt);
+            match self.parse_statement() {
+                Ok(stmt) => program.0.push(stmt),
+                Err(err) => self.errors.push(err),
             }
             self.next_token();
         }
 
-        if !self.errors.is_empty() {
-            self.eprint_errors();
-            return None;
-        }
-
-        Some(program)
-    }
-
-    pub fn eprint_errors(&self) {
-        for err in self.errors.iter() {
-            eprintln!("{}", err);
+        if self.errors.is_empty() {
+            Ok(program)
+        } else {
+            Err(self.errors.clone())
         }
     }
 
-    fn parse_statement(&mut self) -> Option<Statement> {
+    fn parse_statement(&mut self) -> Result<Statement, ParseError> {
         match self.curr_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
@@ -144,101 +130,48 @@ impl Parser {
         }
     }
 
-    fn parse_expression(&mut self, precedence: usize) -> Option<Expression> {
-        match get_prefix_fn(&self.curr_token) {
-            Some(prefix_fn) => match prefix_fn(self) {
-                Some(mut lhs) => {
-                    while self.peek_token != Token::Semicolon
-                        && precedence < get_precedence(&self.peek_token)
-                    {
-                        if let Some(infix_fn) = get_infix_fn(&self.peek_token) {
-                            self.next_token();
-                            match infix_fn(self, Box::new(lhs.clone())) {
-                                Some(expr) => {
-                                    lhs = expr;
-                                }
-                                None => {
-                                    self.errors.push(fmt_expression_error("operand"));
-                                    return None;
-                                }
-                            }
-                        } else {
-                            return Some(lhs);
-                        }
-                    }
-
-                    Some(lhs)
-                }
-                None => {
-                    self.errors.push(fmt_expression_error("operand"));
-                    None
-                }
-            },
-            None => {
-                self.errors.push(format!(
-                    "parse error: no prefix function found for {}",
-                    self.curr_token.get_literal()
-                ));
-                None
-            }
-        }
-    }
-
-    fn parse_let_statement(&mut self) -> Option<Statement> {
+    fn parse_let_statement(&mut self) -> Result<Statement, ParseError> {
+        let mut name = String::new();
         match &self.peek_token {
-            Token::Identifier(_) => {
+            Token::Identifier(identifier) => {
+                name = identifier.to_owned();
                 self.next_token();
-                let identifier = self.curr_token.get_literal();
 
-                if !self.expect_peek(&Token::Assign) {
-                    return None;
-                }
+                self.expect_peek(&Token::Assign)?;
 
                 self.next_token();
 
-                match self.parse_expression(LOWEST) {
-                    Some(value) => {
-                        if self.peek_token == Token::Semicolon {
-                            self.next_token();
-                        }
+                let value = self.parse_expression(LOWEST)?;
 
-                        Some(Statement::Let(LetStatement {
-                            identifier: IdentifierExpression { name: identifier },
-                            value,
-                        }))
-                    }
-                    None => {
-                        self.errors.push(fmt_expression_error("value"));
-                        None
-                    }
-                }
-            }
-            _ => {
-                self.errors.push("identifier not found".to_string());
-                None
-            }
-        }
-    }
-
-    fn parse_return_statement(&mut self) -> Option<Statement> {
-        self.next_token();
-
-        match self.parse_expression(LOWEST) {
-            Some(value) => {
                 if self.peek_token == Token::Semicolon {
                     self.next_token();
                 }
 
-                Some(Statement::Return(ReturnStatement { value }))
+                Ok(Statement::Let(LetStatement {
+                    identifier: IdentifierExpression { name },
+                    value,
+                }))
             }
-            None => {
-                self.errors.push(fmt_expression_error("return value"));
-                None
-            }
+            token => Err(format!(
+                "expected identifier, found {}",
+                token.get_literal()
+            )),
         }
     }
 
-    fn parse_expression_statement(&mut self) -> Option<Statement> {
+    fn parse_return_statement(&mut self) -> Result<Statement, ParseError> {
+        self.next_token();
+
+        let value = self.parse_expression(LOWEST)?;
+
+        if self.peek_token == Token::Semicolon {
+            self.next_token();
+        }
+
+        Ok(Statement::Return(ReturnStatement { value }))
+    }
+
+    fn parse_expression_statement(&mut self) -> Result<Statement, ParseError> {
         let expression = self.parse_expression(LOWEST);
 
         if self.peek_token == Token::Semicolon {
@@ -254,7 +187,7 @@ impl Parser {
         self.next_token();
 
         while self.curr_token != Token::RBrace && self.curr_token != Token::Eof {
-            if let Some(stmt) = self.parse_statement() {
+            if let Ok(stmt) = self.parse_statement() {
                 statements.push(stmt);
             }
             self.next_token();
@@ -263,279 +196,255 @@ impl Parser {
         BlockStatement { statements }
     }
 
-    fn parse_identifier_expression(&mut self) -> Option<Expression> {
-        Some(Expression::Identifier(IdentifierExpression {
+    fn parse_expression(&mut self, precedence: usize) -> Result<Expression, ParseError> {
+        match get_prefix_fn(&self.curr_token) {
+            Some(prefix_fn) => {
+                let mut lhs = prefix_fn(self)?;
+
+                while self.peek_token != Token::Semicolon
+                    && precedence < get_precedence(&self.peek_token)
+                {
+                    if let Some(infix_fn) = get_infix_fn(&self.peek_token) {
+                        self.next_token();
+                        lhs = infix_fn(self, Box::new(lhs.clone()))?;
+                    } else {
+                        return Ok(lhs);
+                    }
+                }
+
+                Ok(lhs)
+            }
+            None => Err(format!(
+                "no prefix function found for {}",
+                self.curr_token.get_literal()
+            )),
+        }
+    }
+
+    fn parse_identifier_expression(&mut self) -> Result<Expression, ParseError> {
+        Ok(Expression::Identifier(IdentifierExpression {
             name: self.curr_token.get_literal(),
         }))
     }
 
-    fn parse_integer_expression(&mut self) -> Option<Expression> {
+    fn parse_integer_expression(&mut self) -> Result<Expression, ParseError> {
         match self.curr_token.get_literal().parse() {
-            Ok(int) => Some(Expression::Integer(IntegerExpression { value: int })),
-            Err(_) => {
-                self.errors.push(format!(
-                    "parse error: expected integer, found {}",
-                    self.curr_token.get_literal()
-                ));
-                None
-            }
+            Ok(int) => Ok(Expression::Integer(IntegerExpression { value: int })),
+            Err(_) => Err(format!(
+                "expected integer, found {}",
+                self.curr_token.get_literal()
+            )),
         }
     }
 
-    fn parse_prefix_expression(&mut self) -> Option<Expression> {
+    fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
         let prefix = self.curr_token.clone();
         self.next_token();
-        match self.parse_expression(PREFIX) {
-            Some(expr) => Some(Expression::Prefix(PrefixExpression {
-                prefix,
-                operand: Box::new(expr),
-            })),
-            None => {
-                self.errors.push(fmt_expression_error("prefix operand"));
-                None
-            }
-        }
+        let operand = self.parse_expression(PREFIX)?;
+
+        Ok(Expression::Prefix(PrefixExpression {
+            prefix,
+            operand: Box::new(operand),
+        }))
     }
 
-    fn parse_infix_expression(&mut self, lhs: Box<Expression>) -> Option<Expression> {
+    fn parse_infix_expression(&mut self, lhs: Box<Expression>) -> Result<Expression, ParseError> {
         let operator = self.curr_token.clone();
         let precedence = get_precedence(&self.curr_token);
         self.next_token();
-        match self.parse_expression(precedence) {
-            Some(rhs) => Some(Expression::Infix(InfixExpression {
-                operator,
-                lhs,
-                rhs: Box::new(rhs),
-            })),
-            None => {
-                self.errors.push(fmt_expression_error("infix operand"));
-                None
-            }
-        }
+        let rhs = self.parse_expression(precedence)?;
+
+        Ok(Expression::Infix(InfixExpression {
+            operator,
+            lhs,
+            rhs: Box::new(rhs),
+        }))
     }
 
-    fn parse_boolean_expression(&mut self) -> Option<Expression> {
+    fn parse_boolean_expression(&mut self) -> Result<Expression, ParseError> {
         match self.curr_token.get_literal().parse() {
-            Ok(boolean) => Some(Expression::Boolean(BooleanExpression { value: boolean })),
-            Err(_) => {
-                self.errors.push(format!(
-                    "parse error: expected boolean, found {}",
-                    self.curr_token.get_literal()
-                ));
-                None
-            }
+            Ok(boolean) => Ok(Expression::Boolean(BooleanExpression { value: boolean })),
+            Err(_) => Err(format!(
+                "expected boolean, found {}",
+                self.curr_token.get_literal()
+            )),
         }
     }
 
-    fn parse_grouped_expression(&mut self) -> Option<Expression> {
+    fn parse_grouped_expression(&mut self) -> Result<Expression, ParseError> {
         self.next_token();
-        let expr = self.parse_expression(LOWEST);
-        if !self.expect_peek(&Token::RParen) {
-            return None;
-        };
-        expr
+        let expr = self.parse_expression(LOWEST)?;
+        self.expect_peek(&Token::RParen)?;
+
+        Ok(expr)
     }
 
-    fn parse_if_expression(&mut self) -> Option<Expression> {
-        if !self.expect_peek(&Token::LParen) {
-            return None;
-        };
+    fn parse_if_expression(&mut self) -> Result<Expression, ParseError> {
+        self.expect_peek(&Token::LParen)?;
 
         self.next_token();
-        match self.parse_expression(LOWEST) {
-            Some(expr) => {
-                let condition = Box::new(expr);
+        let expr = self.parse_expression(LOWEST)?;
+        let condition = Box::new(expr);
 
-                if !self.expect_peek(&Token::RParen) {
-                    return None;
-                };
+        self.expect_peek(&Token::RParen)?;
 
-                if !self.expect_peek(&Token::LBrace) {
-                    return None;
-                };
+        self.expect_peek(&Token::LBrace)?;
 
-                let consequence = self.parse_block_statement();
+        let consequence = self.parse_block_statement();
 
-                let alternative = if self.peek_token == Token::Else {
-                    self.next_token();
-                    if !self.expect_peek(&Token::LBrace) {
-                        return None;
-                    }
+        let alternative = if self.peek_token == Token::Else {
+            self.next_token();
+            self.expect_peek(&Token::LBrace)?;
 
-                    Some(self.parse_block_statement())
-                } else {
-                    None
-                };
+            Some(self.parse_block_statement())
+        } else {
+            None
+        };
 
-                Some(Expression::If(IfExpression {
-                    condition,
-                    consequence,
-                    alternative,
-                }))
-            }
-            None => {
-                self.errors.push(fmt_expression_error("condition"));
-                None
-            }
-        }
+        Ok(Expression::If(IfExpression {
+            condition,
+            consequence,
+            alternative,
+        }))
     }
 
-    fn parse_fn_literal_expression(&mut self) -> Option<Expression> {
-        if !self.expect_peek(&Token::LParen) {
-            return None;
-        };
+    fn parse_fn_literal_expression(&mut self) -> Result<Expression, ParseError> {
+        self.expect_peek(&Token::LParen)?;
 
-        let parameters = self.parse_function_parameters();
+        let parameters = self.parse_function_parameters()?;
 
-        if !self.expect_peek(&Token::LBrace) {
-            return None;
-        };
+        self.expect_peek(&Token::LBrace)?;
 
         let body = self.parse_block_statement();
 
-        Some(Expression::FnLiteral(FnLiteralExpression {
+        Ok(Expression::FnLiteral(FnLiteralExpression {
             parameters,
             body,
         }))
     }
 
-    fn parse_function_parameters(&mut self) -> Vec<IdentifierExpression> {
-        let mut identifiers = Vec::new();
+    fn parse_function_parameters(&mut self) -> Result<Vec<IdentifierExpression>, ParseError> {
+        let mut parameters = Vec::new();
 
         if self.peek_token == Token::RParen {
             self.next_token();
-            return identifiers;
+            return Ok(parameters);
         };
 
         self.next_token();
 
-        let identifier = IdentifierExpression {
-            name: self.curr_token.get_literal(),
-        };
-        identifiers.push(identifier);
+        match &self.curr_token {
+            Token::Identifier(name) => {
+                parameters.push(IdentifierExpression {
+                    name: name.to_owned(),
+                });
+            }
+            token => {
+                return Err(format!(
+                    "expected identifier, found {}",
+                    token.get_literal()
+                ))
+            }
+        }
 
         while self.peek_token == Token::Comma {
             self.next_token();
             self.next_token();
-            let identifier = IdentifierExpression {
-                name: self.curr_token.get_literal(),
-            };
-            identifiers.push(identifier);
+            match &self.curr_token {
+                Token::Identifier(identifier) => parameters.push(IdentifierExpression {
+                    name: identifier.to_owned(),
+                }),
+                token => {
+                    return Err(format!(
+                        "expected identifier, found {}",
+                        token.get_literal()
+                    ))
+                }
+            }
         }
 
-        if !self.expect_peek(&Token::RParen) {
-            return Vec::new();
-        };
+        self.expect_peek(&Token::RParen)?;
 
-        identifiers
+        Ok(parameters)
     }
 
-    fn parse_string_literal_expression(&mut self) -> Option<Expression> {
-        Some(Expression::String(StringExpression {
+    fn parse_string_literal_expression(&mut self) -> Result<Expression, ParseError> {
+        Ok(Expression::String(StringExpression {
             value: self.curr_token.get_literal(),
         }))
     }
 
-    fn parse_call_expression(&mut self, lhs: Box<Expression>) -> Option<Expression> {
-        Some(Expression::Call(CallExpression {
+    fn parse_call_expression(&mut self, lhs: Box<Expression>) -> Result<Expression, ParseError> {
+        Ok(Expression::Call(CallExpression {
             function: lhs,
-            arguments: self.parse_expression_list(Token::RParen),
+            arguments: self.parse_expression_list(Token::RParen)?,
         }))
     }
 
-    fn parse_array_literal_expression(&mut self) -> Option<Expression> {
-        Some(Expression::ArrayLiteral(ArrayLiteralExpression {
-            elements: self.parse_expression_list(Token::RBracket),
+    fn parse_array_literal_expression(&mut self) -> Result<Expression, ParseError> {
+        Ok(Expression::ArrayLiteral(ArrayLiteralExpression {
+            elements: self.parse_expression_list(Token::RBracket)?,
         }))
     }
 
-    fn parse_expression_list(&mut self, end: Token) -> Vec<Expression> {
+    fn parse_expression_list(&mut self, end: Token) -> Result<Vec<Expression>, ParseError> {
         let mut exprs = Vec::new();
 
         if self.peek_token == end {
             self.next_token();
-            return exprs;
+            return Ok(exprs);
         }
 
         self.next_token();
-        if let Some(expr) = self.parse_expression(LOWEST) {
+        if let Ok(expr) = self.parse_expression(LOWEST) {
             exprs.push(expr);
         }
 
         while self.peek_token == Token::Comma {
             self.next_token();
             self.next_token();
-            if let Some(expr) = self.parse_expression(LOWEST) {
+            if let Ok(expr) = self.parse_expression(LOWEST) {
                 exprs.push(expr);
             }
         }
 
-        if !self.expect_peek(&end) {
-            return Vec::new();
-        }
+        self.expect_peek(&end)?;
 
-        exprs
+        Ok(exprs)
     }
 
-    fn parse_index_expression(&mut self, lhs: Box<Expression>) -> Option<Expression> {
+    fn parse_index_expression(&mut self, lhs: Box<Expression>) -> Result<Expression, ParseError> {
         self.next_token();
-        match self.parse_expression(LOWEST) {
-            Some(index) => {
-                if !self.expect_peek(&Token::RBracket) {
-                    return None;
-                };
+        let index = self.parse_expression(LOWEST)?;
+        self.expect_peek(&Token::RBracket)?;
 
-                Some(Expression::Index(IndexExpression {
-                    identifier: lhs,
-                    index: Box::new(index),
-                }))
-            }
-            None => {
-                self.errors.push(fmt_expression_error("index"));
-                None
-            }
-        }
+        Ok(Expression::Index(IndexExpression {
+            identifier: lhs,
+            index: Box::new(index),
+        }))
     }
 
-    fn parse_hash_literal_expression(&mut self) -> Option<Expression> {
+    fn parse_hash_literal_expression(&mut self) -> Result<Expression, ParseError> {
         let mut pairs = BTreeMap::new();
 
         while self.peek_token != Token::RBrace {
             self.next_token();
-            match self.parse_expression(LOWEST) {
-                Some(key) => {
-                    if !self.expect_peek(&Token::Colon) {
-                        return None;
-                    }
+            let key = self.parse_expression(LOWEST)?;
 
-                    self.next_token();
-                    match self.parse_expression(LOWEST) {
-                        Some(value) => {
-                            pairs.insert(key, value);
+            self.expect_peek(&Token::Colon)?;
 
-                            if self.peek_token != Token::RBrace && !self.expect_peek(&Token::Comma)
-                            {
-                                return None;
-                            }
-                        }
-                        None => {
-                            self.errors.push(fmt_expression_error("hash value"));
-                            return None;
-                        }
-                    }
-                }
-                None => {
-                    self.errors.push(fmt_expression_error("hash key"));
-                    return None;
-                }
+            self.next_token();
+            let value = self.parse_expression(LOWEST)?;
+            pairs.insert(key, value);
+
+            if self.peek_token != Token::RBrace {
+                self.expect_peek(&Token::Comma)?;
             }
         }
 
-        if !self.expect_peek(&Token::RBrace) {
-            return None;
-        }
+        self.expect_peek(&Token::RBrace)?;
 
-        Some(Expression::HashLiteral(HashLiteralExpression { pairs }))
+        Ok(Expression::HashLiteral(HashLiteralExpression { pairs }))
     }
 
     fn next_token(&mut self) {
@@ -543,17 +452,13 @@ impl Parser {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn expect_peek(&mut self, expected: &Token) -> bool {
+    fn expect_peek(&mut self, expected: &Token) -> Result<(), ParseError> {
         match &self.peek_token {
             token if token == expected => {
                 self.next_token();
-                true
+                Ok(())
             }
-            _ => {
-                self.errors
-                    .push(fmt_token_error(expected, &self.peek_token));
-                false
-            }
+            _ => Err(fmt_token_error(expected, &self.peek_token)),
         }
     }
 }
