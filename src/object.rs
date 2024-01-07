@@ -1,23 +1,28 @@
 use std::{
     cell::RefCell,
     collections::{hash_map::DefaultHasher, BTreeMap, HashMap},
+    fmt::Display,
     hash::{Hash, Hasher},
     rc::Rc,
 };
 
-use crate::ast::{BlockStatement, IdentifierExpression, Node};
+use crate::ast::{fmt_identifier_expressions, BlockStatement, IdentifierExpression};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {
-    Integer(Integer),
-    Boolean(Boolean),
-    String(StringObj),
-    ReturnValue(ReturnValue),
-    Function(Function),
-    Builtin(Builtin),
-    Array(Array),
-    Hash(HashObj),
-    Error(Error),
+    Integer(i32),
+    Boolean(bool),
+    String(String),
+    ReturnValue(Box<Object>),
+    Function {
+        parameters: Vec<IdentifierExpression>,
+        body: BlockStatement,
+        env: Rc<RefCell<Environment>>,
+    },
+    Builtin(BuiltinFn),
+    Array(Vec<Object>),
+    Hash(BTreeMap<HashKey, HashPair>),
+    Error(String),
     Null,
 }
 
@@ -30,7 +35,7 @@ impl Object {
             Object::Boolean(_) => "BOOLEAN".to_string(),
             Object::String(_) => "STRING".to_string(),
             Object::ReturnValue(_) => "RETURN".to_string(),
-            Object::Function(_) => "FUNCTION".to_string(),
+            Object::Function { .. } => "FUNCTION".to_string(),
             Object::Builtin(_) => "BUILTIN".to_string(),
             Object::Array(_) => "ARRAY".to_string(),
             Object::Hash(_) => "HASH".to_string(),
@@ -41,152 +46,82 @@ impl Object {
 
     pub fn get_hash_key(&self) -> Option<HashKey> {
         match self {
-            Object::Integer(integer) => Some(integer.get_hash_key()),
-            Object::Boolean(boolean) => Some(boolean.get_hash_key()),
-            Object::String(string) => Some(string.get_hash_key()),
+            Object::Integer(integer) => Some(HashKey {
+                kind: "INTEGER".to_string(),
+                value: *integer as u64,
+            }),
+            Object::Boolean(boolean) => Some(HashKey {
+                kind: "BOOLEAN".to_string(),
+                value: match boolean {
+                    false => 0,
+                    true => 1,
+                },
+            }),
+            Object::String(string) => {
+                let mut hasher = DefaultHasher::new();
+                Hash::hash(&string, &mut hasher);
+                Some(HashKey {
+                    kind: "STRING".to_string(),
+                    value: hasher.finish(),
+                })
+            }
             _ => None,
         }
     }
+}
 
-    pub fn inspect(&self) -> String {
+impl Display for Object {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Object::Integer(integer) => format!("{}", integer.value),
-            Object::Boolean(boolean) => format!("{}", boolean.value),
-            Object::String(string) => string.value.clone(),
-            Object::ReturnValue(return_value) => return_value.value.inspect(),
-            Object::Function(function) => [
-                "fn(".to_string(),
-                function
-                    .parameters
+            Self::Integer(integer) => write!(f, "{}", integer),
+            Self::Boolean(boolean) => write!(f, "{}", boolean),
+            Self::String(string) => write!(f, "{}", string),
+            Self::ReturnValue(value) => write!(f, "{}", value),
+            Self::Function {
+                parameters, body, ..
+            } => {
+                write!(
+                    f,
+                    "fn({}) {{ {} }}",
+                    fmt_identifier_expressions(parameters, ", "),
+                    body
+                )
+            }
+            Self::Builtin(_) => write!(f, "builtin function"),
+            Self::Array(elements) => write!(
+                f,
+                "[{}]",
+                elements
                     .iter()
-                    .map(|stmt| stmt.to_string())
+                    .map(|obj| obj.to_string())
                     .collect::<Vec<String>>()
-                    .join(", "),
-                ") ".to_string(),
-                function.body.to_string(),
-            ]
-            .join(""),
-            Object::Builtin(_) => "builtin function".to_string(),
-            Object::Array(array) => [
-                "[".to_string(),
-                array
-                    .elements
+                    .join(", ")
+            ),
+            Self::Hash(pairs) => write!(
+                f,
+                "[{}]",
+                pairs
                     .iter()
-                    .map(|stmt| stmt.inspect())
+                    .map(|(_, v)| format!("{}: {}", v.key, v.value))
                     .collect::<Vec<String>>()
-                    .join(", "),
-                "]".to_string(),
-            ]
-            .join(""),
-            Object::Hash(hash) => [
-                "{".to_string(),
-                hash.pairs
-                    .values()
-                    .map(|pair| [pair.key.inspect(), pair.value.inspect()].join(": "))
-                    .collect::<Vec<String>>()
-                    .join(", "),
-                "}".to_string(),
-            ]
-            .join(""),
-            Object::Error(error) => format!("ERROR: {}", error.message),
-            Object::Null => "null".to_string(),
+                    .join(", ")
+            ),
+            Self::Error(msg) => write!(f, "{}", msg),
+            Self::Null => write!(f, "null"),
         }
     }
-}
-
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct Integer {
-    pub value: i32,
-}
-
-impl Hashable for Integer {
-    fn get_hash_key(&self) -> HashKey {
-        HashKey {
-            kind: "INTEGER".to_string(),
-            value: self.value as u64,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct Boolean {
-    pub value: bool,
-}
-
-impl Hashable for Boolean {
-    fn get_hash_key(&self) -> HashKey {
-        HashKey {
-            kind: "BOOLEAN".to_string(),
-            value: match self.value {
-                false => 0,
-                true => 1,
-            },
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct StringObj {
-    pub value: String,
-}
-
-impl Hashable for StringObj {
-    fn get_hash_key(&self) -> HashKey {
-        let mut hasher = DefaultHasher::new();
-        Hash::hash(&self.value, &mut hasher);
-        HashKey {
-            kind: "STRING".to_string(),
-            value: hasher.finish(),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct ReturnValue {
-    pub value: Box<Object>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Function {
-    pub parameters: Vec<IdentifierExpression>,
-    pub body: BlockStatement,
-    pub env: Rc<RefCell<Environment>>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Builtin {
-    pub function: BuiltinFn,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Array {
-    pub elements: Vec<Object>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct HashPair {
-    pub key: Object,
-    pub value: Object,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct HashObj {
-    pub pairs: BTreeMap<HashKey, HashPair>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Error {
-    pub message: String,
-}
-
-trait Hashable {
-    fn get_hash_key(&self) -> HashKey;
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct HashKey {
     kind: String,
     value: u64,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct HashPair {
+    pub key: Object,
+    pub value: Object,
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::ast::{
-    ArrayLiteralExpression, HashLiteralExpression, IndexExpression, StringExpression,
+    ArrayLiteralExpression, HashLiteralExpression, IndexExpression, Node, StringExpression,
 };
 use crate::{
     ast::{
@@ -82,6 +82,12 @@ fn fmt_token_error(expected: &Token, result: &Token) -> ParseError {
 
 fn fmt_expression_error(expr: &str) -> ParseError {
     format!("parse error: no valid expression found for {}", expr)
+}
+
+pub fn parse(input: &str) -> Option<Node> {
+    let lexer = Lexer::new(input);
+    let mut parser = Parser::new(lexer);
+    parser.parse_program().map(Node::Program)
 }
 
 pub struct Parser {
@@ -197,7 +203,7 @@ impl Parser {
                         }
 
                         Some(Statement::Let(LetStatement {
-                            name: IdentifierExpression { value: identifier },
+                            identifier: IdentifierExpression { name: identifier },
                             value,
                         }))
                     }
@@ -242,7 +248,7 @@ impl Parser {
         expression.map(|expr| Statement::Expression(ExpressionStatement { expr }))
     }
 
-    fn parse_block_statement(&mut self) -> Statement {
+    fn parse_block_statement(&mut self) -> BlockStatement {
         let mut statements = Vec::new();
 
         self.next_token();
@@ -254,12 +260,12 @@ impl Parser {
             self.next_token();
         }
 
-        Statement::Block(BlockStatement { statements })
+        BlockStatement { statements }
     }
 
     fn parse_identifier_expression(&mut self) -> Option<Expression> {
         Some(Expression::Identifier(IdentifierExpression {
-            value: self.curr_token.get_literal(),
+            name: self.curr_token.get_literal(),
         }))
     }
 
@@ -282,7 +288,7 @@ impl Parser {
         match self.parse_expression(PREFIX) {
             Some(expr) => Some(Expression::Prefix(PrefixExpression {
                 prefix,
-                expr: Box::new(expr),
+                operand: Box::new(expr),
             })),
             None => {
                 self.errors.push(fmt_expression_error("prefix operand"));
@@ -348,10 +354,7 @@ impl Parser {
                     return None;
                 };
 
-                let consequence = match self.parse_block_statement() {
-                    Statement::Block(block_stmt) => block_stmt,
-                    _ => unreachable!(),
-                };
+                let consequence = self.parse_block_statement();
 
                 let alternative = if self.peek_token == Token::Else {
                     self.next_token();
@@ -359,10 +362,7 @@ impl Parser {
                         return None;
                     }
 
-                    Some(match self.parse_block_statement() {
-                        Statement::Block(block_stmt) => block_stmt,
-                        _ => unreachable!(),
-                    })
+                    Some(self.parse_block_statement())
                 } else {
                     None
                 };
@@ -391,10 +391,7 @@ impl Parser {
             return None;
         };
 
-        let body = match self.parse_block_statement() {
-            Statement::Block(block_stmt) => block_stmt,
-            _ => unreachable!(),
-        };
+        let body = self.parse_block_statement();
 
         Some(Expression::FnLiteral(FnLiteralExpression {
             parameters,
@@ -413,7 +410,7 @@ impl Parser {
         self.next_token();
 
         let identifier = IdentifierExpression {
-            value: self.curr_token.get_literal(),
+            name: self.curr_token.get_literal(),
         };
         identifiers.push(identifier);
 
@@ -421,7 +418,7 @@ impl Parser {
             self.next_token();
             self.next_token();
             let identifier = IdentifierExpression {
-                value: self.curr_token.get_literal(),
+                name: self.curr_token.get_literal(),
             };
             identifiers.push(identifier);
         }

@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::{ast::AstNode, evaluator::eval, lexer::Lexer, object::Environment, parser::Parser};
+use crate::{evaluator::eval, object::Environment, parser::parse};
 
 const PROMPT: &str = ">> ";
 
@@ -18,11 +18,9 @@ pub fn start_repl() {
         match io::stdout().flush() {
             Ok(_) => match io::stdin().read_line(&mut input) {
                 Ok(_) => {
-                    let lexer = Lexer::new(input.as_str());
-                    let mut parser = Parser::new(lexer);
-                    if let Some(program) = parser.parse_program() {
-                        if let Some(evaluated) = eval(AstNode::Program(program), env.clone()) {
-                            println!("{}", evaluated.inspect());
+                    if let Some(program) = parse(&input) {
+                        if let Some(evaluated) = eval(program, env.clone()) {
+                            println!("{}", evaluated);
                         }
                     }
                 }

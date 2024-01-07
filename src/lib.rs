@@ -13,18 +13,15 @@ mod tests {
 
     use crate::{
         ast::{
-            ArrayLiteralExpression, AstNode, BlockStatement, BooleanExpression, CallExpression,
-            Expression, ExpressionStatement, FnLiteralExpression, HashLiteralExpression,
-            IdentifierExpression, IfExpression, IndexExpression, InfixExpression,
-            IntegerExpression, LetStatement, PrefixExpression, ReturnStatement, Statement,
-            StringExpression,
+            ArrayLiteralExpression, BlockStatement, BooleanExpression, CallExpression, Expression,
+            ExpressionStatement, FnLiteralExpression, HashLiteralExpression, IdentifierExpression,
+            IfExpression, IndexExpression, InfixExpression, IntegerExpression, LetStatement, Node,
+            PrefixExpression, Program, ReturnStatement, Statement, StringExpression,
         },
         evaluator::eval,
         lexer::Lexer,
-        object::{
-            Array, Boolean, Environment, Error, HashObj, HashPair, Integer, Object, StringObj,
-        },
-        parser::Parser,
+        object::{Environment, HashPair, Object},
+        parser::parse,
         token::Token,
     };
 
@@ -153,35 +150,30 @@ mod tests {
 let y = true;
 let foobar = y;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![
             Statement::Let(LetStatement {
-                name: IdentifierExpression {
-                    value: String::from("x"),
+                identifier: IdentifierExpression {
+                    name: String::from("x"),
                 },
                 value: Expression::Integer(IntegerExpression { value: 5 }),
             }),
             Statement::Let(LetStatement {
-                name: IdentifierExpression {
-                    value: String::from("y"),
+                identifier: IdentifierExpression {
+                    name: String::from("y"),
                 },
                 value: Expression::Boolean(BooleanExpression { value: true }),
             }),
             Statement::Let(LetStatement {
-                name: IdentifierExpression {
-                    value: String::from("foobar"),
+                identifier: IdentifierExpression {
+                    name: String::from("foobar"),
                 },
                 value: Expression::Identifier(IdentifierExpression {
-                    value: "y".to_string(),
+                    name: "y".to_string(),
                 }),
             }),
         ];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -191,9 +183,6 @@ let foobar = y;";
 return true;
 return x;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![
             Statement::Return(ReturnStatement {
                 value: Expression::Integer(IntegerExpression { value: 5 }),
@@ -203,14 +192,13 @@ return x;";
             }),
             Statement::Return(ReturnStatement {
                 value: Expression::Identifier(IdentifierExpression {
-                    value: "x".to_string(),
+                    name: "x".to_string(),
                 }),
             }),
         ];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -218,18 +206,14 @@ return x;";
     fn test_parse_expression_statements() {
         let input = "foobar;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Identifier(IdentifierExpression {
-                value: String::from("foobar"),
+                name: String::from("foobar"),
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -237,16 +221,12 @@ return x;";
     fn test_parse_integer_expression() {
         let input = "5;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Integer(IntegerExpression { value: 5 }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -254,18 +234,14 @@ return x;";
     fn test_parse_string_expression() {
         let input = "\"hello world\";";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::String(StringExpression {
                 value: "hello world".to_string(),
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -273,19 +249,15 @@ return x;";
     fn test_parse_prefix_bang_expression() {
         let input = "!5;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Prefix(PrefixExpression {
                 prefix: Token::Bang,
-                expr: Box::new(Expression::Integer(IntegerExpression { value: 5 })),
+                operand: Box::new(Expression::Integer(IntegerExpression { value: 5 })),
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -293,19 +265,15 @@ return x;";
     fn test_parse_prefix_minus_expression() {
         let input = "-12;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Prefix(PrefixExpression {
                 prefix: Token::Minus,
-                expr: Box::new(Expression::Integer(IntegerExpression { value: 12 })),
+                operand: Box::new(Expression::Integer(IntegerExpression { value: 12 })),
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -315,9 +283,6 @@ return x;";
         let expected_operators = [Token::Plus, Token::Minus, Token::Equal, Token::NotEqual];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-
             let expected = vec![Statement::Expression(ExpressionStatement {
                 expr: Expression::Infix(InfixExpression {
                     operator: expected_operators[i].clone(),
@@ -325,10 +290,9 @@ return x;";
                     rhs: Box::new(Expression::Integer(IntegerExpression { value: 6 })),
                 }),
             })];
-            let parsed_input = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            assert_eq!(*parsed_input, expected);
+
+            let parsed_input = parse(input).expect("error occurred while parsing program");
+            assert_eq!(parsed_input, Node::Program(Program(expected)));
             //assert_eq!(parsed_input.to_string(), input.to_string());
         }
     }
@@ -373,12 +337,7 @@ return x;";
         ];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-
-            let parsed_input = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
+            let parsed_input = parse(input).expect("error occurred while parsing program");
             assert_eq!(parsed_input.to_string(), expected_strings[i].to_string());
         }
     }
@@ -392,16 +351,12 @@ return x;";
         ];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-
             let expected = vec![Statement::Expression(ExpressionStatement {
                 expr: Expression::Boolean(expected_values[i].clone()),
             })];
-            let parsed_input = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            assert_eq!(*parsed_input, expected);
+
+            let parsed_input = parse(input).expect("error occurred while parsing program");
+            assert_eq!(parsed_input, Node::Program(Program(expected)));
             //assert_eq!(parsed_input.to_string(), input.to_string());
         }
     }
@@ -410,34 +365,30 @@ return x;";
     fn test_parse_if_expression_no_alternative() {
         let input = "if (x > y) { x };";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::If(IfExpression {
                 condition: Box::new(Expression::Infix(InfixExpression {
                     operator: Token::GreaterThan,
                     lhs: Box::new(Expression::Identifier(IdentifierExpression {
-                        value: "x".to_string(),
+                        name: "x".to_string(),
                     })),
                     rhs: Box::new(Expression::Identifier(IdentifierExpression {
-                        value: "y".to_string(),
+                        name: "y".to_string(),
                     })),
                 })),
                 consequence: BlockStatement {
                     statements: vec![Statement::Expression(ExpressionStatement {
                         expr: Expression::Identifier(IdentifierExpression {
-                            value: "x".to_string(),
+                            name: "x".to_string(),
                         }),
                     })],
                 },
                 alternative: None,
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -445,40 +396,36 @@ return x;";
     fn test_parse_if_expression_with_alternative() {
         let input = "if (x > y) { x } else { y };";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::If(IfExpression {
                 condition: Box::new(Expression::Infix(InfixExpression {
                     operator: Token::GreaterThan,
                     lhs: Box::new(Expression::Identifier(IdentifierExpression {
-                        value: "x".to_string(),
+                        name: "x".to_string(),
                     })),
                     rhs: Box::new(Expression::Identifier(IdentifierExpression {
-                        value: "y".to_string(),
+                        name: "y".to_string(),
                     })),
                 })),
                 consequence: BlockStatement {
                     statements: vec![Statement::Expression(ExpressionStatement {
                         expr: Expression::Identifier(IdentifierExpression {
-                            value: "x".to_string(),
+                            name: "x".to_string(),
                         }),
                     })],
                 },
                 alternative: Some(BlockStatement {
                     statements: vec![Statement::Expression(ExpressionStatement {
                         expr: Expression::Identifier(IdentifierExpression {
-                            value: "y".to_string(),
+                            name: "y".to_string(),
                         }),
                     })],
                 }),
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -486,17 +433,14 @@ return x;";
     fn test_parse_function_literal() {
         let input = "fn(x, y) { x + y; }";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::FnLiteral(FnLiteralExpression {
                 parameters: vec![
                     IdentifierExpression {
-                        value: "x".to_string(),
+                        name: "x".to_string(),
                     },
                     IdentifierExpression {
-                        value: "y".to_string(),
+                        name: "y".to_string(),
                     },
                 ],
                 body: BlockStatement {
@@ -504,20 +448,19 @@ return x;";
                         expr: Expression::Infix(InfixExpression {
                             operator: Token::Plus,
                             lhs: Box::new(Expression::Identifier(IdentifierExpression {
-                                value: "x".to_string(),
+                                name: "x".to_string(),
                             })),
                             rhs: Box::new(Expression::Identifier(IdentifierExpression {
-                                value: "y".to_string(),
+                                name: "y".to_string(),
                             })),
                         }),
                     })],
                 },
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -527,32 +470,28 @@ return x;";
         let expected_parameters = [
             vec![],
             vec![IdentifierExpression {
-                value: "x".to_string(),
+                name: "x".to_string(),
             }],
             vec![
                 IdentifierExpression {
-                    value: "x".to_string(),
+                    name: "x".to_string(),
                 },
                 IdentifierExpression {
-                    value: "y".to_string(),
+                    name: "y".to_string(),
                 },
             ],
         ];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
-
             let expected = vec![Statement::Expression(ExpressionStatement {
                 expr: Expression::FnLiteral(FnLiteralExpression {
                     parameters: expected_parameters[i].clone(),
                     body: BlockStatement { statements: vec![] },
                 }),
             })];
-            let parsed_input = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            assert_eq!(*parsed_input, expected);
+
+            let parsed_input = parse(input).expect("error occurred while parsing program");
+            assert_eq!(parsed_input, Node::Program(Program(expected)));
             //assert_eq!(parsed_input.to_string(), input.to_string());
         }
     }
@@ -561,13 +500,10 @@ return x;";
     fn test_parse_call_expression() {
         let input = "add(1, 2 * 3, 4 + 5)";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Call(CallExpression {
                 function: Box::new(Expression::Identifier(IdentifierExpression {
-                    value: "add".to_string(),
+                    name: "add".to_string(),
                 })),
                 arguments: vec![
                     Expression::Integer(IntegerExpression { value: 1 }),
@@ -584,19 +520,15 @@ return x;";
                 ],
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
     #[test]
     fn test_parse_array_literal() {
         let input = "[1, 2 * 2, 3 + 3]";
-
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
 
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::ArrayLiteral(ArrayLiteralExpression {
@@ -615,19 +547,15 @@ return x;";
                 ],
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
     #[test]
     fn test_parse_hash_literal() {
         let input = "{ \"one\": 1, true: 2, 3: 16/4 }";
-
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
 
         let mut expected_map = BTreeMap::new();
         expected_map.insert(
@@ -654,10 +582,9 @@ return x;";
                 pairs: expected_map,
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -665,18 +592,14 @@ return x;";
     fn test_parse_empty_hash_literal() {
         let input = "{ }";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::HashLiteral(HashLiteralExpression {
                 pairs: BTreeMap::new(),
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -684,13 +607,10 @@ return x;";
     fn test_parse_index_expression() {
         let input = "myArray[1 + 1]";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Index(IndexExpression {
                 identifier: Box::new(Expression::Identifier(IdentifierExpression {
-                    value: "myArray".to_string(),
+                    name: "myArray".to_string(),
                 })),
                 index: Box::new(Expression::Infix(InfixExpression {
                     operator: Token::Plus,
@@ -699,10 +619,9 @@ return x;";
                 })),
             }),
         })];
-        let parsed_input = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        assert_eq!(*parsed_input, expected);
+
+        let parsed_input = parse(input).expect("error occurred while parsing program");
+        assert_eq!(parsed_input, Node::Program(Program(expected)));
         //assert_eq!(parsed_input.to_string(), input.to_string());
     }
 
@@ -723,20 +642,13 @@ return x;";
         let expected_values = [5, 10, -5, -10, 10, 32, 20, 25, 60, 50];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
-            let expected = Object::Integer(Integer {
-                value: expected_values[i],
-            });
+            let expected = Object::Integer(expected_values[i]);
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -767,20 +679,13 @@ return x;";
         ];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
-            let expected = Object::Boolean(Boolean {
-                value: expected_values[i],
-            });
+            let expected = Object::Boolean(expected_values[i]);
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -792,20 +697,13 @@ return x;";
         let expected_values = ["Hello World!", "Hello World!"];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
-            let expected = Object::String(StringObj {
-                value: expected_values[i].to_string(),
-            });
+            let expected = Object::String(expected_values[i].to_string());
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -817,20 +715,13 @@ return x;";
         let expected_values = [false, true];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
-            let expected = Object::Boolean(Boolean {
-                value: expected_values[i],
-            });
+            let expected = Object::Boolean(expected_values[i]);
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -846,26 +737,21 @@ return x;";
             "if (1 > 2) { 10 } else { 20 }",
         ];
         let expected_values = [
-            Object::Integer(Integer { value: 10 }),
+            Object::Integer(10),
             Object::Null,
-            Object::Integer(Integer { value: 10 }),
-            Object::Integer(Integer { value: 10 }),
-            Object::Integer(Integer { value: 20 }),
+            Object::Integer(10),
+            Object::Integer(10),
+            Object::Integer(20),
         ];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
             let expected = expected_values[i].clone();
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -883,20 +769,13 @@ return x;";
         let expected_values = [10, 10, 10, 10, 10];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
-            let expected = Object::Integer(Integer {
-                value: expected_values[i],
-            });
+            let expected = Object::Integer(expected_values[i]);
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -926,20 +805,13 @@ return x;";
         ];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
-            let expected = Object::Error(Error {
-                message: expected_values[i].to_string(),
-            });
+            let expected = Object::Error(expected_values[i].to_string());
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -956,20 +828,13 @@ return x;";
         let expected_values = [5, 25, 5, 15];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
-            let expected = Object::Integer(Integer {
-                value: expected_values[i],
-            });
+            let expected = Object::Integer(expected_values[i]);
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -988,20 +853,13 @@ return x;";
         let expected_values = [5, 5, 10, 10, 20, 5];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
-            let expected = Object::Integer(Integer {
-                value: expected_values[i],
-            });
+            let expected = Object::Integer(expected_values[i]);
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -1028,65 +886,42 @@ return x;";
             "push([1])",
         ];
         let expected_values = [
-            Object::Integer(Integer { value: 0 }),
-            Object::Integer(Integer { value: 4 }),
-            Object::Integer(Integer { value: 11 }),
-            Object::Error(Error {
-                message: "argument to 'len' not supported, found INTEGER".to_string(),
-            }),
-            Object::Error(Error {
-                message: "wrong number of arguments: expected 1, found 2".to_string(),
-            }),
-            Object::Integer(Integer { value: 4 }),
-            Object::Integer(Integer { value: 2 }),
-            Object::Integer(Integer { value: 1 }),
-            Object::Error(Error {
-                message: "argument to 'first' must be ARRAY, found INTEGER".to_string(),
-            }),
-            Object::Integer(Integer { value: 4 }),
-            Object::Error(Error {
-                message: "argument to 'last' must be ARRAY, found FUNCTION".to_string(),
-            }),
-            Object::Array(Array {
-                elements: vec![
-                    Object::Integer(Integer { value: 2 }),
-                    Object::Integer(Integer { value: 3 }),
-                    Object::Integer(Integer { value: 4 }),
-                ],
-            }),
-            Object::Error(Error {
-                message: "argument to 'rest' must be ARRAY, found STRING".to_string(),
-            }),
-            Object::Array(Array {
-                elements: vec![
-                    Object::Integer(Integer { value: 1 }),
-                    Object::Integer(Integer { value: 2 }),
-                    Object::Integer(Integer { value: 3 }),
-                    Object::Integer(Integer { value: 4 }),
-                    Object::Integer(Integer { value: 5 }),
-                ],
-            }),
-            Object::Error(Error {
-                message: "argument to 'push' must be ARRAY, found STRING".to_string(),
-            }),
-            Object::Error(Error {
-                message: "wrong number of arguments: expected 2, found 1".to_string(),
-            }),
+            Object::Integer(0),
+            Object::Integer(4),
+            Object::Integer(11),
+            Object::Error("argument to 'len' not supported, found INTEGER".to_string()),
+            Object::Error("wrong number of arguments: expected 1, found 2".to_string()),
+            Object::Integer(4),
+            Object::Integer(2),
+            Object::Integer(1),
+            Object::Error("argument to 'first' must be ARRAY, found INTEGER".to_string()),
+            Object::Integer(4),
+            Object::Error("argument to 'last' must be ARRAY, found FUNCTION".to_string()),
+            Object::Array(vec![
+                Object::Integer(2),
+                Object::Integer(3),
+                Object::Integer(4),
+            ]),
+            Object::Error("argument to 'rest' must be ARRAY, found STRING".to_string()),
+            Object::Array(vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(3),
+                Object::Integer(4),
+                Object::Integer(5),
+            ]),
+            Object::Error("argument to 'push' must be ARRAY, found STRING".to_string()),
+            Object::Error("wrong number of arguments: expected 2, found 1".to_string()),
         ];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
             let expected = expected_values[i].clone();
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -1096,24 +931,17 @@ return x;";
     fn test_eval_array_literal() {
         let input = "[1, 2 * 2, 3 + 3]";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
         let env = Rc::new(RefCell::new(Environment::new()));
 
-        let expected = Object::Array(Array {
-            elements: vec![
-                Object::Integer(Integer { value: 1 }),
-                Object::Integer(Integer { value: 4 }),
-                Object::Integer(Integer { value: 6 }),
-            ],
-        });
+        let expected = Object::Array(vec![
+            Object::Integer(1),
+            Object::Integer(4),
+            Object::Integer(6),
+        ]);
 
-        let program = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        println!("{program:?}");
-        let eval_input =
-            eval(AstNode::Program(program), env).expect("error occurred while evaluating program");
+        let program = parse(input).expect("error occurred while parsing program");
+        println!("{program}");
+        let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
         assert_eq!(eval_input, expected);
     }
@@ -1130,48 +958,40 @@ return x;";
                 false: 6
             }";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
         let env = Rc::new(RefCell::new(Environment::new()));
 
         let mut expected_pairs = BTreeMap::new();
-        let key_one = Object::String(StringObj {
-            value: "one".to_string(),
-        });
+        let key_one = Object::String("one".to_string());
         expected_pairs.insert(
             key_one
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_one,
-                value: Object::Integer(Integer { value: 1 }),
+                value: Object::Integer(1),
             },
         );
-        let key_two = Object::String(StringObj {
-            value: "two".to_string(),
-        });
+        let key_two = Object::String("two".to_string());
         expected_pairs.insert(
             key_two
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_two,
-                value: Object::Integer(Integer { value: 2 }),
+                value: Object::Integer(2),
             },
         );
-        let key_three = Object::String(StringObj {
-            value: "three".to_string(),
-        });
+        let key_three = Object::String("three".to_string());
         expected_pairs.insert(
             key_three
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_three,
-                value: Object::Integer(Integer { value: 3 }),
+                value: Object::Integer(3),
             },
         );
-        let key_four = Object::Integer(Integer { value: 4 });
+        let key_four = Object::Integer(4);
         expected_pairs.insert(
             key_four
                 .get_hash_key()
@@ -1181,36 +1001,32 @@ return x;";
                 value: key_four,
             },
         );
-        let key_five = Object::Boolean(Boolean { value: true });
+        let key_five = Object::Boolean(true);
         expected_pairs.insert(
             key_five
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_five,
-                value: Object::Integer(Integer { value: 5 }),
+                value: Object::Integer(5),
             },
         );
-        let key_six = Object::Boolean(Boolean { value: false });
+        let key_six = Object::Boolean(false);
         expected_pairs.insert(
             key_six
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
                 key: key_six,
-                value: Object::Integer(Integer { value: 6 }),
+                value: Object::Integer(6),
             },
         );
 
-        let expected = Object::Hash(HashObj {
-            pairs: expected_pairs,
-        });
-        let program = parser
-            .parse_program()
-            .expect("error occurred while parsing program");
-        println!("{program:?}");
-        let eval_input =
-            eval(AstNode::Program(program), env).expect("error occurred while evaluating program");
+        let expected = Object::Hash(expected_pairs);
+
+        let program = parse(input).expect("error occurred while parsing program");
+        println!("{program}");
+        let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
         assert_eq!(eval_input, expected);
     }
@@ -1229,30 +1045,25 @@ return x;";
             "[1, 2, 3][-1]",
         ];
         let expected_values = [
-            Object::Integer(Integer { value: 1 }),
-            Object::Integer(Integer { value: 2 }),
-            Object::Integer(Integer { value: 3 }),
-            Object::Integer(Integer { value: 1 }),
-            Object::Integer(Integer { value: 3 }),
-            Object::Integer(Integer { value: 6 }),
-            Object::Integer(Integer { value: 2 }),
+            Object::Integer(1),
+            Object::Integer(2),
+            Object::Integer(3),
+            Object::Integer(1),
+            Object::Integer(3),
+            Object::Integer(6),
+            Object::Integer(2),
             Object::Null,
             Object::Null,
         ];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
             let expected = expected_values[i].clone();
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
@@ -1270,28 +1081,23 @@ return x;";
             "{false: 5}[false]",
         ];
         let expected_values = [
-            Object::Integer(Integer { value: 5 }),
+            Object::Integer(5),
             Object::Null,
-            Object::Integer(Integer { value: 5 }),
+            Object::Integer(5),
             Object::Null,
-            Object::Integer(Integer { value: 5 }),
-            Object::Integer(Integer { value: 5 }),
-            Object::Integer(Integer { value: 5 }),
+            Object::Integer(5),
+            Object::Integer(5),
+            Object::Integer(5),
         ];
 
         for (i, input) in inputs.iter().enumerate() {
-            let lexer = Lexer::new(input);
-            let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new()));
 
             let expected = expected_values[i].clone();
 
-            let program = parser
-                .parse_program()
-                .expect("error occurred while parsing program");
-            println!("{program:?}");
-            let eval_input = eval(AstNode::Program(program), env)
-                .expect("error occurred while evaluating program");
+            let program = parse(input).expect("error occurred while parsing program");
+            println!("{program}");
+            let eval_input = eval(program, env).expect("error occurred while evaluating program");
 
             assert_eq!(eval_input, expected);
         }
