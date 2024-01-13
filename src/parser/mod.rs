@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use crate::{ast::*, lexer::Lexer, token::Token};
+use crate::{lexer::token::Token, lexer::Lexer, parser::ast::*};
+
+pub mod ast;
+mod test_parser;
 
 const LOWEST: usize = 1;
 const EQUALS: usize = 2;

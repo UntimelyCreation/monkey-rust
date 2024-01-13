@@ -2,11 +2,16 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use crate::ast::{
+use crate::parser::ast::{
     BlockStatement, Expression, HashLiteralExpression, IdentifierExpression, IfExpression, Node,
     Statement,
 };
-use crate::object::{Environment, HashKey, HashPair, Object};
+use environment::Environment;
+use object::{HashKey, HashPair, Object};
+
+pub mod environment;
+pub mod object;
+mod test_evaluator;
 
 type EvalError = String;
 
@@ -160,13 +165,13 @@ fn eval_infix_expression(
 ) -> Result<Object, EvalError> {
     match (&lhs, &rhs) {
         (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
-            eval_integer_infix_expression(operator, lhs_value, rhs_value)
+            eval_integer_infix_expression(&operator, lhs_value, rhs_value)
         }
         (Object::Boolean(lhs_value), Object::Boolean(rhs_value)) => {
-            eval_boolean_infix_expression(operator, lhs_value, rhs_value)
+            eval_boolean_infix_expression(&operator, lhs_value, rhs_value)
         }
         (Object::String(lhs_value), Object::String(rhs_value)) => {
-            eval_string_infix_expression(operator, lhs_value, rhs_value)
+            eval_string_infix_expression(&operator, lhs_value, rhs_value)
         }
         _ => Err(format!(
             "unknown operator: {} {} {}",
@@ -178,42 +183,38 @@ fn eval_infix_expression(
 }
 
 fn eval_integer_infix_expression(
-    operator: String,
+    operator: &str,
     lhs: &i32,
     rhs: &i32,
 ) -> Result<Object, EvalError> {
     match operator {
-        operator if operator == *"+" => Ok(Object::Integer(lhs + rhs)),
-        operator if operator == *"-" => Ok(Object::Integer(lhs - rhs)),
-        operator if operator == *"*" => Ok(Object::Integer(lhs * rhs)),
-        operator if operator == *"/" => Ok(Object::Integer(lhs / rhs)),
-        operator if operator == *"<" => Ok(get_bool_object(lhs < rhs)),
-        operator if operator == *">" => Ok(get_bool_object(lhs > rhs)),
-        operator if operator == *"==" => Ok(get_bool_object(lhs == rhs)),
-        operator if operator == *"!=" => Ok(get_bool_object(lhs != rhs)),
+        "+" => Ok(Object::Integer(lhs + rhs)),
+        "-" => Ok(Object::Integer(lhs - rhs)),
+        "*" => Ok(Object::Integer(lhs * rhs)),
+        "/" => Ok(Object::Integer(lhs / rhs)),
+        "<" => Ok(get_bool_object(lhs < rhs)),
+        ">" => Ok(get_bool_object(lhs > rhs)),
+        "==" => Ok(get_bool_object(lhs == rhs)),
+        "!=" => Ok(get_bool_object(lhs != rhs)),
         _ => Err(format!("unknown operator: INTEGER {} INTEGER", operator,)),
     }
 }
 
 fn eval_boolean_infix_expression(
-    operator: String,
+    operator: &str,
     lhs: &bool,
     rhs: &bool,
 ) -> Result<Object, EvalError> {
     match operator {
-        operator if operator == *"==" => Ok(get_bool_object(lhs == rhs)),
-        operator if operator == *"!=" => Ok(get_bool_object(lhs != rhs)),
+        "==" => Ok(get_bool_object(lhs == rhs)),
+        "!=" => Ok(get_bool_object(lhs != rhs)),
         _ => Err(format!("unknown operator: BOOLEAN {} BOOLEAN", operator,)),
     }
 }
 
-fn eval_string_infix_expression(
-    operator: String,
-    lhs: &str,
-    rhs: &str,
-) -> Result<Object, EvalError> {
+fn eval_string_infix_expression(operator: &str, lhs: &str, rhs: &str) -> Result<Object, EvalError> {
     match operator {
-        operator if operator == *"+" => Ok(Object::String([lhs, rhs].join(""))),
+        "+" => Ok(Object::String([lhs, rhs].join(""))),
         _ => Err(format!("unknown operator: STRING {} STRING", operator,)),
     }
 }

@@ -1,12 +1,13 @@
 use std::{
     cell::RefCell,
-    collections::{hash_map::DefaultHasher, BTreeMap, HashMap},
+    collections::{hash_map::DefaultHasher, BTreeMap},
     fmt::Display,
     hash::{Hash, Hasher},
     rc::Rc,
 };
 
-use crate::ast::{fmt_identifier_expressions, BlockStatement, IdentifierExpression};
+use crate::evaluator::environment::Environment;
+use crate::parser::ast::{fmt_identifier_expressions, BlockStatement, IdentifierExpression};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {
@@ -122,39 +123,4 @@ pub struct HashKey {
 pub struct HashPair {
     pub key: Object,
     pub value: Object,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Environment {
-    map: HashMap<String, Object>,
-    outer: Option<Rc<RefCell<Environment>>>,
-}
-
-impl Environment {
-    pub fn new() -> Self {
-        Environment {
-            map: HashMap::new(),
-            outer: None,
-        }
-    }
-
-    pub fn new_enclosed(self) -> Self {
-        let mut env = Environment::new();
-        env.outer = Some(Rc::new(RefCell::new(self)));
-        env
-    }
-
-    pub fn get(&self, identifier: &String) -> Option<Object> {
-        match self.map.get(identifier) {
-            None => match &self.outer {
-                Some(outer) => outer.borrow().get(identifier),
-                None => None,
-            },
-            result => result.cloned(),
-        }
-    }
-
-    pub fn set(&mut self, identifier: String, val: Object) {
-        self.map.insert(identifier, val);
-    }
 }

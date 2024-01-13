@@ -1,4 +1,7 @@
-use crate::token::{match_identifier, Token};
+use token::{match_identifier, Token};
+
+mod test_lexer;
+pub mod token;
 
 pub struct Lexer {
     input: String,
