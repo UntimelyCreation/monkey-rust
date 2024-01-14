@@ -1,4 +1,7 @@
-use crate::token::{match_identifier, Token, TokenType};
+use token::{match_identifier, Token};
+
+mod test_lexer;
+pub mod token;
 
 pub struct Lexer {
     input: String,
@@ -24,7 +27,7 @@ impl Lexer {
         let mut tokens = Vec::new();
 
         let mut token = self.next_token();
-        while token.kind != TokenType::Eof {
+        while token != Token::Eof {
             tokens.push(token);
             token = self.next_token();
         }
@@ -41,36 +44,36 @@ impl Lexer {
             '=' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Token::from_str(TokenType::Equal, "==")
+                    Token::Equal
                 } else {
-                    Token::from_char(TokenType::Assign, self.character)
+                    Token::Assign
                 }
             }
-            '+' => Token::from_char(TokenType::Plus, self.character),
-            '-' => Token::from_char(TokenType::Minus, self.character),
+            '+' => Token::Plus,
+            '-' => Token::Minus,
             '!' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Token::from_str(TokenType::NotEqual, "!=")
+                    Token::NotEqual
                 } else {
-                    Token::from_char(TokenType::Bang, self.character)
+                    Token::Bang
                 }
             }
-            '/' => Token::from_char(TokenType::Slash, self.character),
-            '*' => Token::from_char(TokenType::Asterisk, self.character),
-            '<' => Token::from_char(TokenType::LessThan, self.character),
-            '>' => Token::from_char(TokenType::GreaterThan, self.character),
-            ',' => Token::from_char(TokenType::Comma, self.character),
-            ';' => Token::from_char(TokenType::Semicolon, self.character),
-            ':' => Token::from_char(TokenType::Colon, self.character),
-            '(' => Token::from_char(TokenType::LParen, self.character),
-            ')' => Token::from_char(TokenType::RParen, self.character),
-            '{' => Token::from_char(TokenType::LBrace, self.character),
-            '}' => Token::from_char(TokenType::RBrace, self.character),
-            '[' => Token::from_char(TokenType::LBracket, self.character),
-            ']' => Token::from_char(TokenType::RBracket, self.character),
-            '"' => Token::from_str(TokenType::String, &self.read_string()),
-            '\0' => Token::from_char(TokenType::Eof, self.character),
+            '/' => Token::Slash,
+            '*' => Token::Asterisk,
+            '<' => Token::LessThan,
+            '>' => Token::GreaterThan,
+            ',' => Token::Comma,
+            ';' => Token::Semicolon,
+            ':' => Token::Colon,
+            '(' => Token::LParen,
+            ')' => Token::RParen,
+            '{' => Token::LBrace,
+            '}' => Token::RBrace,
+            '[' => Token::LBracket,
+            ']' => Token::RBracket,
+            '"' => Token::String(self.read_string()),
+            '\0' => Token::Eof,
             ch if ch.is_ascii_alphabetic() => {
                 let position = self.position;
                 while self.character.is_ascii_alphabetic() {
@@ -85,9 +88,12 @@ impl Lexer {
                     self.read_char();
                 }
                 skip_read_char = true;
-                Token::from_str(TokenType::Integer, &self.input[position..self.position])
+                match self.input[position..self.position].parse() {
+                    Ok(integer) => Token::Integer(integer),
+                    Err(_) => Token::Unknown,
+                }
             }
-            _ => Token::from_char(TokenType::Unknown, '\0'),
+            _ => Token::Unknown,
         };
 
         if !skip_read_char {

@@ -6,7 +6,7 @@ I started this project to learn about how programming languages work by building
 
 I chose Rust instead of Go mainly for practice, and also to avoid copy-pasting the code directly from the book. Rust also seems better suited for this kind of low-level work.
 
-I try to stay as close as possible to Thorsten's Go implementation for now as I'm still learning. I intend to refactor the code into more idiomatic Rust and add additional features later on.
+I try to stay as close as possible to Thorsten's Go implementation for now as I'm still learning. I intend to add additional features later on.
 
 
 ## Usage
