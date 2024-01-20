@@ -2,7 +2,8 @@ mod test_code;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcode {
-    OpConstant = 0,
+    OpConstant,
+    OpAdd,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -34,15 +35,19 @@ impl Instructions {
 }
 
 pub struct Definition {
-    name: String,
+    name: &'static str,
     operand_widths: Vec<usize>,
 }
 
 pub fn lookup(op: &Opcode) -> Definition {
     match op {
         Opcode::OpConstant => Definition {
-            name: "OpConstant".to_owned(),
+            name: "OpConstant",
             operand_widths: vec![2],
+        },
+        Opcode::OpAdd => Definition {
+            name: "OpAdd",
+            operand_widths: vec![],
         },
     }
 }

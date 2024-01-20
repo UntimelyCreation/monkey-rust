@@ -11,21 +11,23 @@ mod tests {
         let program = parse(input).expect("error occurred while parsing program");
 
         let mut compiler = Compiler::new();
-        let _ = compiler.compile(&program);
+        let bytecode = compiler
+            .compile(&program)
+            .expect("error occurred while compiling program");
 
-        let bytecode = compiler.bytecode();
         assert_eq!(expected_instrs, bytecode.instructions);
         assert_eq!(expected_constants, bytecode.constants);
     }
 
     #[test]
-    fn test_compiler() {
+    fn test_integer_arithmetic() {
         let input = "1 + 2";
         let expected_constants = vec![Object::Integer(1), Object::Integer(2)];
         let expected_instrs = Instructions {
             stream: vec![
                 make(Opcode::OpConstant, &[0]),
                 make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpAdd, &[]),
             ],
         };
 

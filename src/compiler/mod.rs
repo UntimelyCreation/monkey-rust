@@ -1,6 +1,7 @@
 use crate::{
     code::{make, Instructions, Opcode},
     evaluator::object::Object,
+    lexer::token::Token,
     parser::ast::{Expression, Node, Statement},
 };
 
@@ -8,9 +9,15 @@ mod test_compiler;
 
 type CompileError = String;
 
-struct Compiler {
+pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Compiler {
@@ -46,6 +53,16 @@ impl Compiler {
             Expression::Infix(infix) => {
                 self.compile_expr(&infix.lhs)?;
                 self.compile_expr(&infix.rhs)?;
+
+                match infix.operator {
+                    Token::Plus => self.emit(Opcode::OpAdd, &[]),
+                    _ => {
+                        return Err(format!(
+                            "unknown operator: {}",
+                            infix.operator.get_literal()
+                        ))
+                    }
+                };
                 Ok(())
             }
             Expression::Integer(integer) => {
@@ -58,7 +75,7 @@ impl Compiler {
         }
     }
 
-    pub fn bytecode(&self) -> Bytecode {
+    fn bytecode(&self) -> Bytecode {
         Bytecode {
             instructions: self.instructions.clone(),
             constants: self.constants.clone(),
@@ -82,7 +99,7 @@ impl Compiler {
     }
 }
 
-struct Bytecode {
-    instructions: Instructions,
-    constants: Vec<Object>,
+pub struct Bytecode {
+    pub instructions: Instructions,
+    pub constants: Vec<Object>,
 }

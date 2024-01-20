@@ -4,18 +4,32 @@ mod tests {
 
     #[test]
     fn test_make() {
-        let instruction = make(Opcode::OpConstant, &[65534]);
-        let expected = (Opcode::OpConstant, vec![255, 254]);
-        assert_eq!(expected, instruction);
+        let instructions = [make(Opcode::OpConstant, &[65534]), make(Opcode::OpAdd, &[])];
+        let expected_instrs = [
+            (Opcode::OpConstant, vec![255, 254]),
+            (Opcode::OpAdd, vec![]),
+        ];
+
+        for (i, instr) in instructions.into_iter().enumerate() {
+            let expected = expected_instrs[i].clone();
+            assert_eq!(expected, instr);
+        }
     }
 
     #[test]
     fn test_parse() {
-        let instruction = parse(
-            &lookup(&Opcode::OpConstant),
-            (Opcode::OpConstant, vec![255, 254]),
-        );
-        let expected = (vec![65534], 2);
-        assert_eq!(expected, instruction);
+        let operands = [
+            parse(
+                &lookup(&Opcode::OpConstant),
+                (Opcode::OpConstant, vec![255, 254]),
+            ),
+            parse(&lookup(&Opcode::OpAdd), (Opcode::OpAdd, vec![])),
+        ];
+        let expected_operands = [(vec![65534], 2), (vec![], 0)];
+
+        for (i, operand) in operands.into_iter().enumerate() {
+            let expected = expected_operands[i].clone();
+            assert_eq!(expected, operand);
+        }
     }
 }
