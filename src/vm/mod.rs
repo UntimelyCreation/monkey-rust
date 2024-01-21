@@ -33,13 +33,11 @@ impl Vm {
             let instr = &self.instructions.stream[ip];
             let op = &instr.0;
             let operands = &instr.1;
-            println!("instruction: {:?} {:?}", op, operands);
 
             match op {
                 Opcode::OpConstant => match operands[..].try_into() {
                     Ok(bytes) => {
                         let const_index = u16::from_be_bytes(bytes) as usize;
-                        println!("const_index {:?}", const_index);
                         self.push(self.constants[const_index].clone())?;
                     }
                     Err(..) => {
@@ -69,7 +67,7 @@ impl Vm {
         Ok(())
     }
 
-    fn stack_top(&self) -> Option<Object> {
+    pub fn stack_top(&self) -> Option<Object> {
         match self.sp {
             0 => None,
             sp => Some(self.stack[sp - 1].clone()),

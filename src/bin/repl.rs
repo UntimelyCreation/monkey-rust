@@ -1,20 +1,14 @@
-use std::{
-    cell::RefCell,
-    io::{self, Write},
-    rc::Rc,
-};
+use std::io::{self, Write};
 
 use monkey_rust::{
-    evaluator::environment::Environment,
-    evaluator::eval,
+    compiler::Compiler,
     parser::{eprint_parse_errors, parse},
+    vm::Vm,
 };
 
 const PROMPT: &str = ">> ";
 
 pub fn main() {
-    let env = Rc::new(RefCell::new(Environment::new()));
-
     println!("Welcome to the Monkey programming language!");
     loop {
         let mut input = String::new();
@@ -24,8 +18,21 @@ pub fn main() {
             Ok(_) => match io::stdin().read_line(&mut input) {
                 Ok(_) => match parse(&input) {
                     Ok(program) => {
-                        let evaluated = eval(program, env.clone());
-                        println!("{}", evaluated);
+                        let mut compiler = Compiler::new();
+                        match compiler.compile(&program) {
+                            Ok(bytecode) => {
+                                let mut vm = Vm::from_bytecode(bytecode);
+                                match vm.run() {
+                                    Ok(_) => {
+                                        if let Some(obj) = vm.stack_top() {
+                                            println!("{}", obj);
+                                        }
+                                    }
+                                    Err(error) => eprintln!("runtime error: {error}"),
+                                }
+                            }
+                            Err(error) => eprintln!("compile error: {error}"),
+                        }
                     }
                     Err(errs) => eprint_parse_errors(&errs),
                 },
