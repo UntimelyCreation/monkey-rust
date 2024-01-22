@@ -100,7 +100,7 @@ impl Display for Expression {
             Expression::Integer(expr) => write!(f, "{}", expr.value),
             Expression::String(expr) => write!(f, "{}", expr.value),
             Expression::Prefix(expr) => {
-                write!(f, "({}{})", expr.prefix.get_literal(), expr.operand)
+                write!(f, "({}{})", expr.operator.get_literal(), expr.operand)
             }
             Expression::Infix(expr) => write!(
                 f,
@@ -170,7 +170,7 @@ pub struct StringExpression {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct PrefixExpression {
-    pub prefix: Token,
+    pub operator: Token,
     pub operand: Box<Expression>,
 }
 

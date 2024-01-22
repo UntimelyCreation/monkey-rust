@@ -246,7 +246,7 @@ impl Parser {
         let operand = self.parse_expression(PREFIX)?;
 
         Ok(Expression::Prefix(PrefixExpression {
-            prefix,
+            operator: prefix,
             operand: Box::new(operand),
         }))
     }

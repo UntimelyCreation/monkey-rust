@@ -3,7 +3,18 @@ mod test_code;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcode {
     OpConstant,
+    OpPop,
     OpAdd,
+    OpSub,
+    OpMul,
+    OpDiv,
+    OpTrue,
+    OpFalse,
+    OpEqual,
+    OpNotEqual,
+    OpGreaterThan,
+    OpMinus,
+    OpBang,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -45,8 +56,52 @@ pub fn lookup(op: &Opcode) -> Definition {
             name: "OpConstant",
             operand_widths: vec![2],
         },
+        Opcode::OpPop => Definition {
+            name: "OpPop",
+            operand_widths: vec![],
+        },
         Opcode::OpAdd => Definition {
             name: "OpAdd",
+            operand_widths: vec![],
+        },
+        Opcode::OpSub => Definition {
+            name: "OpSub",
+            operand_widths: vec![],
+        },
+        Opcode::OpMul => Definition {
+            name: "OpMul",
+            operand_widths: vec![],
+        },
+        Opcode::OpDiv => Definition {
+            name: "OpDiv",
+            operand_widths: vec![],
+        },
+        Opcode::OpTrue => Definition {
+            name: "OpTrue",
+            operand_widths: vec![],
+        },
+        Opcode::OpFalse => Definition {
+            name: "OpFalse",
+            operand_widths: vec![],
+        },
+        Opcode::OpEqual => Definition {
+            name: "OpEqual",
+            operand_widths: vec![],
+        },
+        Opcode::OpNotEqual => Definition {
+            name: "OpNotEqual",
+            operand_widths: vec![],
+        },
+        Opcode::OpGreaterThan => Definition {
+            name: "OpGreaterThan",
+            operand_widths: vec![],
+        },
+        Opcode::OpMinus => Definition {
+            name: "OpMinus",
+            operand_widths: vec![],
+        },
+        Opcode::OpBang => Definition {
+            name: "OpMinus",
             operand_widths: vec![],
         },
     }

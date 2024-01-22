@@ -30,7 +30,7 @@ impl Vm {
     pub fn run(&mut self) -> Result<(), RuntimeError> {
         let mut ip = 0;
         while ip < self.instructions.stream.len() {
-            let instr = &self.instructions.stream[ip];
+            let instr = self.instructions.stream[ip].to_owned();
             let op = &instr.0;
             let operands = &instr.1;
 
@@ -44,22 +44,26 @@ impl Vm {
                         return Err("error in instruction".to_owned());
                     }
                 },
-                Opcode::OpAdd => {
-                    let rhs = self.pop();
-                    let lhs = self.pop();
-                    match (&lhs, &rhs) {
-                        (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
-                            let result = lhs_value + rhs_value;
-                            self.push(Object::Integer(result))?;
-                        }
-                        _ => {
-                            return Err(format!(
-                                "unknown operator: {} + {}",
-                                lhs.get_type_str(),
-                                rhs.get_type_str(),
-                            ));
-                        }
-                    }
+                Opcode::OpPop => {
+                    self.pop();
+                }
+                Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
+                    self.exec_binary_operation(op)?;
+                }
+                Opcode::OpTrue => {
+                    self.push(Object::Boolean(true))?;
+                }
+                Opcode::OpFalse => {
+                    self.push(Object::Boolean(false))?;
+                }
+                Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
+                    self.exec_comparison(op)?;
+                }
+                Opcode::OpMinus => {
+                    self.exec_minus_operator()?;
+                }
+                Opcode::OpBang => {
+                    self.exec_bang_operator()?;
                 }
             }
             ip += 1;
@@ -67,11 +71,116 @@ impl Vm {
         Ok(())
     }
 
-    pub fn stack_top(&self) -> Option<Object> {
-        match self.sp {
-            0 => None,
-            sp => Some(self.stack[sp - 1].clone()),
+    fn exec_binary_operation(&mut self, op: &Opcode) -> Result<(), RuntimeError> {
+        let rhs = self.pop();
+        let lhs = self.pop();
+        match (&lhs, &rhs) {
+            (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
+                self.exec_integer_binary_operation(op, *lhs_value, *rhs_value)
+            }
+            _ => Err(format!(
+                "unsupported types for binary operation: {} {}",
+                lhs.get_type_str(),
+                rhs.get_type_str(),
+            )),
         }
+    }
+
+    fn exec_integer_binary_operation(
+        &mut self,
+        op: &Opcode,
+        lhs: i32,
+        rhs: i32,
+    ) -> Result<(), RuntimeError> {
+        let result = match op {
+            Opcode::OpAdd => Some(lhs + rhs),
+            Opcode::OpSub => Some(lhs - rhs),
+            Opcode::OpMul => Some(lhs * rhs),
+            Opcode::OpDiv => Some(lhs / rhs),
+            _ => None,
+        };
+
+        match result {
+            Some(r) => self.push(Object::Integer(r)),
+            None => Err(format!("unknown INTEGER operator: {:?}", op)),
+        }
+    }
+
+    fn exec_comparison(&mut self, op: &Opcode) -> Result<(), RuntimeError> {
+        let rhs = self.pop();
+        let lhs = self.pop();
+        match (&lhs, &rhs) {
+            (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
+                self.exec_integer_comparison(op, *lhs_value, *rhs_value)
+            }
+            (Object::Boolean(lhs_value), Object::Boolean(rhs_value)) => {
+                self.exec_boolean_comparison(op, *lhs_value, *rhs_value)
+            }
+            _ => Err(format!(
+                "unsupported types for comparison: {} {}",
+                lhs.get_type_str(),
+                rhs.get_type_str(),
+            )),
+        }
+    }
+
+    fn exec_integer_comparison(
+        &mut self,
+        op: &Opcode,
+        lhs: i32,
+        rhs: i32,
+    ) -> Result<(), RuntimeError> {
+        let result = match op {
+            Opcode::OpEqual => Some(lhs == rhs),
+            Opcode::OpNotEqual => Some(lhs != rhs),
+            Opcode::OpGreaterThan => Some(lhs > rhs),
+            _ => None,
+        };
+
+        match result {
+            Some(r) => self.push(Object::Boolean(r)),
+            None => Err(format!("unknown INTEGER operator: {:?}", op)),
+        }
+    }
+
+    fn exec_boolean_comparison(
+        &mut self,
+        op: &Opcode,
+        lhs: bool,
+        rhs: bool,
+    ) -> Result<(), RuntimeError> {
+        let result = match op {
+            Opcode::OpEqual => Some(lhs == rhs),
+            Opcode::OpNotEqual => Some(lhs != rhs),
+            _ => None,
+        };
+
+        match result {
+            Some(r) => self.push(Object::Boolean(r)),
+            None => Err(format!("unknown BOOLEAN operator: {:?}", op)),
+        }
+    }
+
+    fn exec_minus_operator(&mut self) -> Result<(), RuntimeError> {
+        let operand = self.pop();
+        match operand {
+            Object::Integer(value) => self.push(Object::Integer(-value)),
+            _ => Err(format!(
+                "unsupported type for negation: {}",
+                operand.get_type_str()
+            )),
+        }
+    }
+
+    fn exec_bang_operator(&mut self) -> Result<(), RuntimeError> {
+        match self.pop() {
+            Object::Boolean(value) => self.push(Object::Boolean(!value)),
+            _ => self.push(Object::Boolean(false)),
+        }
+    }
+
+    pub fn last_popped(&self) -> Object {
+        self.stack[self.sp].clone()
     }
 
     fn push(&mut self, obj: Object) -> Result<(), RuntimeError> {

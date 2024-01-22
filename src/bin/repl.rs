@@ -24,9 +24,7 @@ pub fn main() {
                                 let mut vm = Vm::from_bytecode(bytecode);
                                 match vm.run() {
                                     Ok(_) => {
-                                        if let Some(obj) = vm.stack_top() {
-                                            println!("{}", obj);
-                                        }
+                                        println!("{}", vm.last_popped());
                                     }
                                     Err(error) => eprintln!("runtime error: {error}"),
                                 }

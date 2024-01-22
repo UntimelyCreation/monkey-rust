@@ -21,16 +21,142 @@ mod tests {
 
     #[test]
     fn test_integer_arithmetic() {
-        let input = "1 + 2";
-        let expected_constants = vec![Object::Integer(1), Object::Integer(2)];
-        let expected_instrs = Instructions {
-            stream: vec![
+        let inputs = ["1; 2", "1 + 2", "1 - 2", "1 * 2", "2 / 1", "-1"];
+        let expected_constants = [
+            vec![Object::Integer(1), Object::Integer(2)],
+            vec![Object::Integer(1), Object::Integer(2)],
+            vec![Object::Integer(1), Object::Integer(2)],
+            vec![Object::Integer(1), Object::Integer(2)],
+            vec![Object::Integer(2), Object::Integer(1)],
+            vec![Object::Integer(1)],
+        ];
+        let expected_instrs = [
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpPop, &[]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
                 make(Opcode::OpConstant, &[0]),
                 make(Opcode::OpConstant, &[1]),
                 make(Opcode::OpAdd, &[]),
+                make(Opcode::OpPop, &[]),
             ],
-        };
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpSub, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpMul, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpDiv, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpMinus, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+        ];
 
-        test_compiling(input, expected_constants, expected_instrs);
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn test_boolean_expressions() {
+        let inputs = [
+            "true",
+            "false",
+            "1 > 2",
+            "1 < 2",
+            "1 == 2",
+            "1 != 2",
+            "true == false",
+            "true != false",
+            "!true",
+        ];
+        let expected_constants = [
+            vec![],
+            vec![],
+            vec![Object::Integer(1), Object::Integer(2)],
+            vec![Object::Integer(2), Object::Integer(1)],
+            vec![Object::Integer(1), Object::Integer(2)],
+            vec![Object::Integer(1), Object::Integer(2)],
+            vec![],
+            vec![],
+            vec![],
+        ];
+        let expected_instrs = [
+            vec![make(Opcode::OpTrue, &[]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpFalse, &[]), make(Opcode::OpPop, &[])],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpGreaterThan, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpGreaterThan, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpEqual, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpNotEqual, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpTrue, &[]),
+                make(Opcode::OpFalse, &[]),
+                make(Opcode::OpEqual, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpTrue, &[]),
+                make(Opcode::OpFalse, &[]),
+                make(Opcode::OpNotEqual, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpTrue, &[]),
+                make(Opcode::OpBang, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
     }
 }

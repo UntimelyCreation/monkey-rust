@@ -84,7 +84,7 @@ fn eval_expression(expr: &Expression, env: Rc<RefCell<Environment>>) -> Result<O
         Expression::String(expr) => Ok(Object::String(expr.value.to_owned())),
         Expression::Prefix(expr) => {
             let rhs = eval_expression(&expr.operand, env)?;
-            eval_prefix_expression(expr.prefix.get_literal(), &rhs)
+            eval_prefix_expression(expr.operator.get_literal(), &rhs)
         }
         Expression::Infix(expr) => {
             let lhs = eval_expression(&expr.lhs, env.clone())?;
