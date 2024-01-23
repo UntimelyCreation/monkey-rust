@@ -69,6 +69,14 @@ impl Object {
             _ => None,
         }
     }
+
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Object::Boolean(value) => *value,
+            Object::Null => false,
+            _ => true,
+        }
+    }
 }
 
 impl Display for Object {

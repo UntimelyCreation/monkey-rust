@@ -3,6 +3,7 @@ mod test_code;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcode {
     OpConstant,
+    OpNull,
     OpPop,
     OpAdd,
     OpSub,
@@ -15,6 +16,8 @@ pub enum Opcode {
     OpGreaterThan,
     OpMinus,
     OpBang,
+    OpJump,
+    OpJumpCond,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -55,6 +58,10 @@ pub fn lookup(op: &Opcode) -> Definition {
         Opcode::OpConstant => Definition {
             name: "OpConstant",
             operand_widths: vec![2],
+        },
+        Opcode::OpNull => Definition {
+            name: "OpNull",
+            operand_widths: vec![],
         },
         Opcode::OpPop => Definition {
             name: "OpPop",
@@ -103,6 +110,14 @@ pub fn lookup(op: &Opcode) -> Definition {
         Opcode::OpBang => Definition {
             name: "OpMinus",
             operand_widths: vec![],
+        },
+        Opcode::OpJump => Definition {
+            name: "OpJump",
+            operand_widths: vec![2],
+        },
+        Opcode::OpJumpCond => Definition {
+            name: "OpJumpCond",
+            operand_widths: vec![2],
         },
     }
 }

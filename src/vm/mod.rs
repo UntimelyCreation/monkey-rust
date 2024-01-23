@@ -44,6 +44,9 @@ impl Vm {
                         return Err("error in instruction".to_owned());
                     }
                 },
+                Opcode::OpNull => {
+                    self.push(Object::Null)?;
+                }
                 Opcode::OpPop => {
                     self.pop();
                 }
@@ -65,6 +68,29 @@ impl Vm {
                 Opcode::OpBang => {
                     self.exec_bang_operator()?;
                 }
+                Opcode::OpJump => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let jump_pos = u16::from_be_bytes(bytes) as usize;
+                        ip = jump_pos - 1;
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_owned());
+                    }
+                },
+                Opcode::OpJumpCond => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let jump_pos = u16::from_be_bytes(bytes) as usize;
+
+                        let condition = self.pop();
+                        if !condition.is_truthy() {
+                            ip = jump_pos - 1;
+                        }
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_owned());
+                    }
+                },
+                _ => todo!(),
             }
             ip += 1;
         }
@@ -175,6 +201,7 @@ impl Vm {
     fn exec_bang_operator(&mut self) -> Result<(), RuntimeError> {
         match self.pop() {
             Object::Boolean(value) => self.push(Object::Boolean(!value)),
+            Object::Null => self.push(Object::Boolean(true)),
             _ => self.push(Object::Boolean(false)),
         }
     }

@@ -2,7 +2,7 @@ use crate::{
     code::{make, Instructions, Opcode},
     evaluator::object::Object,
     lexer::token::Token,
-    parser::ast::{Expression, Node, Statement},
+    parser::ast::{BlockStatement, Expression, Node, Statement},
 };
 
 mod test_compiler;
@@ -12,6 +12,9 @@ type CompileError = String;
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
+
+    last_op: Opcode,
+    prev_op: Opcode,
 }
 
 impl Default for Compiler {
@@ -25,6 +28,8 @@ impl Compiler {
         Compiler {
             instructions: Instructions::new(),
             constants: Vec::new(),
+            last_op: Opcode::OpPop,
+            prev_op: Opcode::OpPop,
         }
     }
 
@@ -39,6 +44,13 @@ impl Compiler {
         }
 
         Ok(self.bytecode())
+    }
+
+    pub fn compile_block_statement(&mut self, stmts: &BlockStatement) -> Result<(), CompileError> {
+        for stmt in stmts.statements.iter() {
+            self.compile_stmt(stmt)?;
+        }
+        Ok(())
     }
 
     pub fn compile_stmt(&mut self, stmt: &Statement) -> Result<(), CompileError> {
@@ -114,6 +126,40 @@ impl Compiler {
                 };
                 Ok(())
             }
+            Expression::If(if_expr) => {
+                self.compile_expr(&if_expr.condition)?;
+
+                // Placeholder operand value
+                let jump_cond_pos = self.emit(Opcode::OpJumpCond, &[-1]);
+
+                self.compile_block_statement(&if_expr.consequence)?;
+                if self.last_op == Opcode::OpPop {
+                    self.remove_last_instr();
+                }
+
+                // Placeholder operand value
+                let jump_pos = self.emit(Opcode::OpJump, &[-1]);
+
+                let after_cons_pos = self.instructions.stream.len();
+                self.update_operand(jump_cond_pos, after_cons_pos as i32);
+
+                match &if_expr.alternative {
+                    Some(alternative) => {
+                        self.compile_block_statement(alternative)?;
+                        if self.last_op == Opcode::OpPop {
+                            self.remove_last_instr();
+                        }
+                    }
+                    None => {
+                        self.emit(Opcode::OpNull, &[]);
+                    }
+                }
+
+                let after_alt_pos = self.instructions.stream.len();
+                self.update_operand(jump_pos, after_alt_pos as i32);
+
+                Ok(())
+            }
             _ => todo!(),
         }
     }
@@ -126,14 +172,35 @@ impl Compiler {
     }
 
     fn emit(&mut self, op: Opcode, operands: &[i32]) -> usize {
-        let instruction = make(op, operands);
-        self.add_instruction(instruction)
+        let instruction = make(op.clone(), operands);
+        let position = self.add_instruction(instruction);
+
+        self.set_last_op(op);
+
+        position
     }
 
     fn add_instruction(&mut self, instruction: (Opcode, Vec<u8>)) -> usize {
         let pos_new_instr = self.instructions.stream.len();
         self.instructions.stream.push(instruction);
         pos_new_instr
+    }
+
+    fn set_last_op(&mut self, op: Opcode) {
+        self.prev_op = self.last_op.clone();
+        self.last_op = op;
+    }
+
+    fn remove_last_instr(&mut self) {
+        self.instructions.stream.pop();
+        self.last_op = self.prev_op.clone();
+    }
+
+    fn update_operand(&mut self, position: usize, operand: i32) {
+        let op = self.instructions.stream[position].0.clone();
+        let new_instr = make(op, &[operand]);
+
+        self.instructions.stream[position] = new_instr;
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {

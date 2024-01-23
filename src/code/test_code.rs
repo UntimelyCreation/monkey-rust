@@ -6,6 +6,7 @@ mod tests {
     fn test_make() {
         let instructions = [
             make(Opcode::OpConstant, &[65534]),
+            make(Opcode::OpNull, &[]),
             make(Opcode::OpPop, &[]),
             make(Opcode::OpAdd, &[]),
             make(Opcode::OpSub, &[]),
@@ -18,9 +19,12 @@ mod tests {
             make(Opcode::OpGreaterThan, &[]),
             make(Opcode::OpMinus, &[]),
             make(Opcode::OpBang, &[]),
+            make(Opcode::OpJump, &[42]),
+            make(Opcode::OpJumpCond, &[267]),
         ];
         let expected_instrs = [
             (Opcode::OpConstant, vec![255, 254]),
+            (Opcode::OpNull, vec![]),
             (Opcode::OpPop, vec![]),
             (Opcode::OpAdd, vec![]),
             (Opcode::OpSub, vec![]),
@@ -33,6 +37,8 @@ mod tests {
             (Opcode::OpGreaterThan, vec![]),
             (Opcode::OpMinus, vec![]),
             (Opcode::OpBang, vec![]),
+            (Opcode::OpJump, vec![0, 42]),
+            (Opcode::OpJumpCond, vec![1, 11]),
         ];
 
         for (i, instr) in instructions.into_iter().enumerate() {
@@ -48,6 +54,7 @@ mod tests {
                 &lookup(&Opcode::OpConstant),
                 (Opcode::OpConstant, vec![255, 254]),
             ),
+            parse(&lookup(&Opcode::OpNull), (Opcode::OpNull, vec![])),
             parse(&lookup(&Opcode::OpPop), (Opcode::OpPop, vec![])),
             parse(&lookup(&Opcode::OpAdd), (Opcode::OpAdd, vec![])),
             parse(&lookup(&Opcode::OpSub), (Opcode::OpSub, vec![])),
@@ -63,6 +70,11 @@ mod tests {
             ),
             parse(&lookup(&Opcode::OpMinus), (Opcode::OpMinus, vec![])),
             parse(&lookup(&Opcode::OpBang), (Opcode::OpBang, vec![])),
+            parse(&lookup(&Opcode::OpJump), (Opcode::OpConstant, vec![0, 42])),
+            parse(
+                &lookup(&Opcode::OpJumpCond),
+                (Opcode::OpConstant, vec![1, 11]),
+            ),
         ];
         let expected_operands = [
             (vec![65534], 2),
@@ -78,6 +90,9 @@ mod tests {
             (vec![], 0),
             (vec![], 0),
             (vec![], 0),
+            (vec![], 0),
+            (vec![42], 2),
+            (vec![267], 2),
         ];
 
         for (i, operand) in operands.into_iter().enumerate() {

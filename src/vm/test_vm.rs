@@ -89,6 +89,7 @@ mod tests {
             "!!true",
             "!!false",
             "!!5",
+            "!(if (false) { 5; })",
         ];
         let expected_objs = vec![
             Object::Boolean(true),
@@ -116,6 +117,39 @@ mod tests {
             Object::Boolean(true),
             Object::Boolean(false),
             Object::Boolean(true),
+            Object::Boolean(true),
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_conditionals() {
+        let inputs = [
+            "if (true) { 10 }",
+            "if (true) { 10 } else { 20 }",
+            "if (false) { 10 } else { 20 }",
+            "if (1) { 10 }",
+            "if (1 < 2) { 10 }",
+            "if (1 < 2) { 10 } else { 20 }",
+            "if (1 > 2) { 10 } else { 20 }",
+            "if (1 > 2) { 10 }",
+            "if (false) { 10 }",
+            "if ((if (false) { 10 })) { 10 } else { 20 }",
+        ];
+        let expected_objs = vec![
+            Object::Integer(10),
+            Object::Integer(10),
+            Object::Integer(20),
+            Object::Integer(10),
+            Object::Integer(10),
+            Object::Integer(10),
+            Object::Integer(20),
+            Object::Null,
+            Object::Null,
+            Object::Integer(20),
         ];
 
         for (i, input) in inputs.iter().enumerate() {

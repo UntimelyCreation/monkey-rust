@@ -159,4 +159,52 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_conditionals() {
+        let inputs = [
+            "if (true) { 10 }; 3333;",
+            "if (true) { 10 } else { 20 }; 3333;",
+        ];
+        let expected_constants = [
+            vec![Object::Integer(10), Object::Integer(3333)],
+            vec![
+                Object::Integer(10),
+                Object::Integer(20),
+                Object::Integer(3333),
+            ],
+        ];
+        let expected_instrs = [
+            vec![
+                make(Opcode::OpTrue, &[]),
+                make(Opcode::OpJumpCond, &[4]),
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpJump, &[5]),
+                make(Opcode::OpNull, &[]),
+                make(Opcode::OpPop, &[]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpTrue, &[]),
+                make(Opcode::OpJumpCond, &[4]),
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpJump, &[5]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpPop, &[]),
+                make(Opcode::OpConstant, &[2]),
+                make(Opcode::OpPop, &[]),
+            ],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
 }
