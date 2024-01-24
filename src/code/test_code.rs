@@ -21,6 +21,8 @@ mod tests {
             make(Opcode::OpBang, &[]),
             make(Opcode::OpJump, &[42]),
             make(Opcode::OpJumpCond, &[267]),
+            make(Opcode::OpGetGlobal, &[5]),
+            make(Opcode::OpSetGlobal, &[6]),
         ];
         let expected_instrs = [
             (Opcode::OpConstant, vec![255, 254]),
@@ -39,6 +41,8 @@ mod tests {
             (Opcode::OpBang, vec![]),
             (Opcode::OpJump, vec![0, 42]),
             (Opcode::OpJumpCond, vec![1, 11]),
+            (Opcode::OpGetGlobal, vec![0, 5]),
+            (Opcode::OpSetGlobal, vec![0, 6]),
         ];
 
         for (i, instr) in instructions.into_iter().enumerate() {
@@ -70,10 +74,18 @@ mod tests {
             ),
             parse(&lookup(&Opcode::OpMinus), (Opcode::OpMinus, vec![])),
             parse(&lookup(&Opcode::OpBang), (Opcode::OpBang, vec![])),
-            parse(&lookup(&Opcode::OpJump), (Opcode::OpConstant, vec![0, 42])),
+            parse(&lookup(&Opcode::OpJump), (Opcode::OpJump, vec![0, 42])),
             parse(
                 &lookup(&Opcode::OpJumpCond),
-                (Opcode::OpConstant, vec![1, 11]),
+                (Opcode::OpJumpCond, vec![1, 11]),
+            ),
+            parse(
+                &lookup(&Opcode::OpGetGlobal),
+                (Opcode::OpGetGlobal, vec![0, 5]),
+            ),
+            parse(
+                &lookup(&Opcode::OpSetGlobal),
+                (Opcode::OpSetGlobal, vec![0, 6]),
             ),
         ];
         let expected_operands = [
@@ -93,6 +105,8 @@ mod tests {
             (vec![], 0),
             (vec![42], 2),
             (vec![267], 2),
+            (vec![5], 2),
+            (vec![6], 2),
         ];
 
         for (i, operand) in operands.into_iter().enumerate() {

@@ -156,4 +156,18 @@ mod tests {
             test_running(input, expected_objs[i].clone());
         }
     }
+
+    #[test]
+    fn test_global_let_statements() {
+        let inputs = [
+            "let one = 1; one",
+            "let one = 1; let two = 2; one + two",
+            "let one = 1; let two = one + one; one + two",
+        ];
+        let expected_objs = vec![Object::Integer(1), Object::Integer(3), Object::Integer(3)];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
 }

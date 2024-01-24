@@ -207,4 +207,50 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_global_let_statements() {
+        let inputs = [
+            "let one = 1; let two = 2;",
+            "let one = 1; one;",
+            "let one = 1; let two = one; two;",
+        ];
+        let expected_constants = [
+            vec![Object::Integer(1), Object::Integer(2)],
+            vec![Object::Integer(1)],
+            vec![Object::Integer(1)],
+        ];
+        let expected_instrs = [
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpSetGlobal, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpSetGlobal, &[1]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpSetGlobal, &[0]),
+                make(Opcode::OpGetGlobal, &[0]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpSetGlobal, &[0]),
+                make(Opcode::OpGetGlobal, &[0]),
+                make(Opcode::OpSetGlobal, &[1]),
+                make(Opcode::OpGetGlobal, &[1]),
+                make(Opcode::OpPop, &[]),
+            ],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
 }

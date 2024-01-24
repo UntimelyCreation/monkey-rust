@@ -9,22 +9,46 @@ mod test_vm;
 type RuntimeError = String;
 
 const STACK_SIZE: usize = 2048;
+pub const GLOBALS_SIZE: usize = 65535;
 
 pub struct Vm {
     constants: Vec<Object>,
     instructions: Instructions,
     stack: Vec<Object>,
     sp: usize,
+    globals: Vec<Object>,
+}
+
+impl Default for Vm {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Vm {
+    pub fn new() -> Self {
+        Self {
+            constants: Vec::new(),
+            instructions: Instructions::new(),
+            stack: vec![Object::Null; STACK_SIZE],
+            sp: 0,
+            globals: vec![Object::Null; GLOBALS_SIZE],
+        }
+    }
+
     pub fn from_bytecode(bytecode: Bytecode) -> Self {
         Self {
             constants: bytecode.constants,
             instructions: bytecode.instructions,
             stack: vec![Object::Null; STACK_SIZE],
             sp: 0,
+            globals: vec![Object::Null; GLOBALS_SIZE],
         }
+    }
+
+    pub fn update(&mut self, bytecode: Bytecode) {
+        self.constants = bytecode.constants;
+        self.instructions = bytecode.instructions;
     }
 
     pub fn run(&mut self) -> Result<(), RuntimeError> {
@@ -85,6 +109,26 @@ impl Vm {
                         if !condition.is_truthy() {
                             ip = jump_pos - 1;
                         }
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_owned());
+                    }
+                },
+                Opcode::OpGetGlobal => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let global_index = u16::from_be_bytes(bytes) as usize;
+
+                        self.push(self.globals[global_index].clone())?;
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_owned());
+                    }
+                },
+                Opcode::OpSetGlobal => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let global_index = u16::from_be_bytes(bytes) as usize;
+
+                        self.globals[global_index] = self.pop();
                     }
                     Err(..) => {
                         return Err("error in instruction".to_owned());

@@ -5,13 +5,18 @@ use crate::{
     parser::ast::{BlockStatement, Expression, Node, Statement},
 };
 
+use self::symbol::SymbolTable;
+
+pub mod symbol;
 mod test_compiler;
+mod test_symbol;
 
 type CompileError = String;
 
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
+    symbol_table: SymbolTable,
 
     last_op: Opcode,
     prev_op: Opcode,
@@ -25,9 +30,10 @@ impl Default for Compiler {
 
 impl Compiler {
     pub fn new() -> Self {
-        Compiler {
+        Self {
             instructions: Instructions::new(),
             constants: Vec::new(),
+            symbol_table: SymbolTable::new(),
             last_op: Opcode::OpPop,
             prev_op: Opcode::OpPop,
         }
@@ -55,8 +61,14 @@ impl Compiler {
 
     pub fn compile_stmt(&mut self, stmt: &Statement) -> Result<(), CompileError> {
         match stmt {
-            Statement::Expression(expr_stmt) => {
-                self.compile_expr(&expr_stmt.expr)?;
+            Statement::Let(stmt) => {
+                self.compile_expr(&stmt.value)?;
+                let symbol = self.symbol_table.define(stmt.identifier.name.clone());
+                self.emit(Opcode::OpSetGlobal, &[symbol.index as i32]);
+                Ok(())
+            }
+            Statement::Expression(stmt) => {
+                self.compile_expr(&stmt.expr)?;
                 self.emit(Opcode::OpPop, &[]);
                 Ok(())
             }
@@ -66,14 +78,14 @@ impl Compiler {
 
     pub fn compile_expr(&mut self, expr: &Expression) -> Result<(), CompileError> {
         match expr {
-            Expression::Integer(integer) => {
-                let int_obj = Object::Integer(integer.value);
+            Expression::Integer(expr) => {
+                let int_obj = Object::Integer(expr.value);
                 let int_pos = self.add_constant(int_obj) as i32;
                 self.emit(Opcode::OpConstant, &[int_pos]);
                 Ok(())
             }
-            Expression::Boolean(boolean) => {
-                match boolean.value {
+            Expression::Boolean(expr) => {
+                match expr.value {
                     true => {
                         self.emit(Opcode::OpTrue, &[]);
                     }
@@ -83,33 +95,35 @@ impl Compiler {
                 }
                 Ok(())
             }
-            Expression::Prefix(prefix) => {
-                self.compile_expr(&prefix.operand)?;
-
-                match prefix.operator {
-                    Token::Minus => self.emit(Opcode::OpMinus, &[]),
-                    Token::Bang => self.emit(Opcode::OpBang, &[]),
-                    _ => {
-                        return Err(format!(
-                            "unknown operator: {}",
-                            prefix.operator.get_literal()
-                        ))
-                    }
+            Expression::Identifier(expr) => {
+                match self.symbol_table.resolve(&expr.name) {
+                    Some(symbol) => self.emit(Opcode::OpGetGlobal, &[symbol.index as i32]),
+                    None => return Err(format!("undefined variable: {}", expr.name)),
                 };
                 Ok(())
             }
-            Expression::Infix(infix) => {
-                if infix.operator == Token::LessThan {
-                    self.compile_expr(&infix.rhs)?;
-                    self.compile_expr(&infix.lhs)?;
+            Expression::Prefix(expr) => {
+                self.compile_expr(&expr.operand)?;
+
+                match expr.operator {
+                    Token::Minus => self.emit(Opcode::OpMinus, &[]),
+                    Token::Bang => self.emit(Opcode::OpBang, &[]),
+                    _ => return Err(format!("unknown operator: {}", expr.operator.get_literal())),
+                };
+                Ok(())
+            }
+            Expression::Infix(expr) => {
+                if expr.operator == Token::LessThan {
+                    self.compile_expr(&expr.rhs)?;
+                    self.compile_expr(&expr.lhs)?;
                     self.emit(Opcode::OpGreaterThan, &[]);
                     return Ok(());
                 }
 
-                self.compile_expr(&infix.lhs)?;
-                self.compile_expr(&infix.rhs)?;
+                self.compile_expr(&expr.lhs)?;
+                self.compile_expr(&expr.rhs)?;
 
-                match infix.operator {
+                match expr.operator {
                     Token::Plus => self.emit(Opcode::OpAdd, &[]),
                     Token::Minus => self.emit(Opcode::OpSub, &[]),
                     Token::Asterisk => self.emit(Opcode::OpMul, &[]),
@@ -117,22 +131,17 @@ impl Compiler {
                     Token::GreaterThan => self.emit(Opcode::OpGreaterThan, &[]),
                     Token::Equal => self.emit(Opcode::OpEqual, &[]),
                     Token::NotEqual => self.emit(Opcode::OpNotEqual, &[]),
-                    _ => {
-                        return Err(format!(
-                            "unknown operator: {}",
-                            infix.operator.get_literal()
-                        ))
-                    }
+                    _ => return Err(format!("unknown operator: {}", expr.operator.get_literal())),
                 };
                 Ok(())
             }
-            Expression::If(if_expr) => {
-                self.compile_expr(&if_expr.condition)?;
+            Expression::If(expr) => {
+                self.compile_expr(&expr.condition)?;
 
                 // Placeholder operand value
                 let jump_cond_pos = self.emit(Opcode::OpJumpCond, &[-1]);
 
-                self.compile_block_statement(&if_expr.consequence)?;
+                self.compile_block_statement(&expr.consequence)?;
                 if self.last_op == Opcode::OpPop {
                     self.remove_last_instr();
                 }
@@ -143,7 +152,7 @@ impl Compiler {
                 let after_cons_pos = self.instructions.stream.len();
                 self.update_operand(jump_cond_pos, after_cons_pos as i32);
 
-                match &if_expr.alternative {
+                match &expr.alternative {
                     Some(alternative) => {
                         self.compile_block_statement(alternative)?;
                         if self.last_op == Opcode::OpPop {
