@@ -20,6 +20,9 @@ pub enum Opcode {
     OpJumpCond,
     OpGetGlobal,
     OpSetGlobal,
+    OpArray,
+    OpHash,
+    OpIndex,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -128,6 +131,18 @@ pub fn lookup(op: &Opcode) -> Definition {
         Opcode::OpSetGlobal => Definition {
             name: "OpSetGlobal",
             operand_widths: vec![2],
+        },
+        Opcode::OpArray => Definition {
+            name: "OpArray",
+            operand_widths: vec![2],
+        },
+        Opcode::OpHash => Definition {
+            name: "OpHash",
+            operand_widths: vec![2],
+        },
+        Opcode::OpIndex => Definition {
+            name: "OpIndex",
+            operand_widths: vec![],
         },
     }
 }

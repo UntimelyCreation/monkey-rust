@@ -298,7 +298,7 @@ fn eval_index_expression(identifier: &Object, index: &Object) -> Result<Object, 
 }
 
 fn eval_array_index_expression(array: &[Object], index: usize) -> Result<Object, EvalError> {
-    if index > array.len() - 1 {
+    if index >= array.len() {
         return Ok(Object::Null);
     }
 

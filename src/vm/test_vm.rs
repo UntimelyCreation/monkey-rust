@@ -1,6 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use crate::{compiler::Compiler, evaluator::object::Object, parser::parse, vm::Vm};
+    use std::collections::BTreeMap;
+
+    use crate::{
+        compiler::Compiler,
+        evaluator::object::{HashPair, Object},
+        parser::parse,
+        vm::Vm,
+    };
 
     fn test_running(input: &str, expected: Object) {
         let program = parse(input).expect("error occurred while parsing program");
@@ -165,6 +172,142 @@ mod tests {
             "let one = 1; let two = one + one; one + two",
         ];
         let expected_objs = vec![Object::Integer(1), Object::Integer(3), Object::Integer(3)];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        let inputs = [
+            "\"monkey\"",
+            "\"mon\" + \"key\"",
+            "\"mon\" + \"key\" + \"banana\"",
+        ];
+        let expected_objs = vec![
+            Object::String("monkey".to_string()),
+            Object::String("monkey".to_string()),
+            Object::String("monkeybanana".to_string()),
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let inputs = ["[]", "[1, 2, 3]", "[1 + 2, 3 * 4, 5 + 6]"];
+        let expected_objs = vec![
+            Object::Array(vec![]),
+            Object::Array(vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(3),
+            ]),
+            Object::Array(vec![
+                Object::Integer(3),
+                Object::Integer(12),
+                Object::Integer(11),
+            ]),
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let inputs = ["{}", "{1: 2, 3: 4, 5: 6}", "{1: 2 + 3, 4: 5 * 6}"];
+
+        let mut expected_map1 = BTreeMap::new();
+        let key1 = Object::Integer(1);
+        expected_map1.insert(
+            key1.get_hash_key()
+                .expect("error occurred while getting hash key"),
+            HashPair {
+                key: key1,
+                value: Object::Integer(2),
+            },
+        );
+        let key2 = Object::Integer(3);
+        expected_map1.insert(
+            key2.get_hash_key()
+                .expect("error occurred while getting hash key"),
+            HashPair {
+                key: key2,
+                value: Object::Integer(4),
+            },
+        );
+        let key3 = Object::Integer(5);
+        expected_map1.insert(
+            key3.get_hash_key()
+                .expect("error occurred while getting hash key"),
+            HashPair {
+                key: key3,
+                value: Object::Integer(6),
+            },
+        );
+
+        let mut expected_map2 = BTreeMap::new();
+        let key1 = Object::Integer(1);
+        expected_map2.insert(
+            key1.get_hash_key()
+                .expect("error occurred while getting hash key"),
+            HashPair {
+                key: key1,
+                value: Object::Integer(5),
+            },
+        );
+        let key2 = Object::Integer(4);
+        expected_map2.insert(
+            key2.get_hash_key()
+                .expect("error occurred while getting hash key"),
+            HashPair {
+                key: key2,
+                value: Object::Integer(30),
+            },
+        );
+
+        let expected_objs = vec![
+            Object::Hash(BTreeMap::new()),
+            Object::Hash(expected_map1),
+            Object::Hash(expected_map2),
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        let inputs = [
+            "[1, 2, 3][1]",
+            "[1, 2, 3][0 + 2]",
+            "[[1, 1, 1]][0][0]",
+            "[][0]",
+            "[1, 2, 3][99]",
+            "[1][-1]",
+            "{1: 1, 2: 2}[1]",
+            "{1: 1, 2: 2}[2]",
+            "{1: 1}[0]",
+            "{}[0]",
+        ];
+        let expected_objs = vec![
+            Object::Integer(2),
+            Object::Integer(3),
+            Object::Integer(1),
+            Object::Null,
+            Object::Null,
+            Object::Null,
+            Object::Integer(1),
+            Object::Integer(2),
+            Object::Null,
+            Object::Null,
+        ];
 
         for (i, input) in inputs.iter().enumerate() {
             test_running(input, expected_objs[i].clone());

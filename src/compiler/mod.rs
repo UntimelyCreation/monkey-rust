@@ -52,23 +52,23 @@ impl Compiler {
         Ok(self.bytecode())
     }
 
-    pub fn compile_block_statement(&mut self, stmts: &BlockStatement) -> Result<(), CompileError> {
+    fn compile_block_statement(&mut self, stmts: &BlockStatement) -> Result<(), CompileError> {
         for stmt in stmts.statements.iter() {
             self.compile_stmt(stmt)?;
         }
         Ok(())
     }
 
-    pub fn compile_stmt(&mut self, stmt: &Statement) -> Result<(), CompileError> {
+    fn compile_stmt(&mut self, stmt: &Statement) -> Result<(), CompileError> {
         match stmt {
             Statement::Let(stmt) => {
-                self.compile_expr(&stmt.value)?;
+                self.compile_expression(&stmt.value)?;
                 let symbol = self.symbol_table.define(stmt.identifier.name.clone());
                 self.emit(Opcode::OpSetGlobal, &[symbol.index as i32]);
                 Ok(())
             }
             Statement::Expression(stmt) => {
-                self.compile_expr(&stmt.expr)?;
+                self.compile_expression(&stmt.expr)?;
                 self.emit(Opcode::OpPop, &[]);
                 Ok(())
             }
@@ -76,25 +76,8 @@ impl Compiler {
         }
     }
 
-    pub fn compile_expr(&mut self, expr: &Expression) -> Result<(), CompileError> {
+    fn compile_expression(&mut self, expr: &Expression) -> Result<(), CompileError> {
         match expr {
-            Expression::Integer(expr) => {
-                let int_obj = Object::Integer(expr.value);
-                let int_pos = self.add_constant(int_obj) as i32;
-                self.emit(Opcode::OpConstant, &[int_pos]);
-                Ok(())
-            }
-            Expression::Boolean(expr) => {
-                match expr.value {
-                    true => {
-                        self.emit(Opcode::OpTrue, &[]);
-                    }
-                    false => {
-                        self.emit(Opcode::OpFalse, &[]);
-                    }
-                }
-                Ok(())
-            }
             Expression::Identifier(expr) => {
                 match self.symbol_table.resolve(&expr.name) {
                     Some(symbol) => self.emit(Opcode::OpGetGlobal, &[symbol.index as i32]),
@@ -102,8 +85,20 @@ impl Compiler {
                 };
                 Ok(())
             }
+            Expression::Integer(expr) => {
+                let int_obj = Object::Integer(expr.value);
+                let int_pos = self.add_constant(int_obj) as i32;
+                self.emit(Opcode::OpConstant, &[int_pos]);
+                Ok(())
+            }
+            Expression::String(expr) => {
+                let string_obj = Object::String(expr.value.clone());
+                let string_pos = self.add_constant(string_obj) as i32;
+                self.emit(Opcode::OpConstant, &[string_pos]);
+                Ok(())
+            }
             Expression::Prefix(expr) => {
-                self.compile_expr(&expr.operand)?;
+                self.compile_expression(&expr.operand)?;
 
                 match expr.operator {
                     Token::Minus => self.emit(Opcode::OpMinus, &[]),
@@ -114,14 +109,14 @@ impl Compiler {
             }
             Expression::Infix(expr) => {
                 if expr.operator == Token::LessThan {
-                    self.compile_expr(&expr.rhs)?;
-                    self.compile_expr(&expr.lhs)?;
+                    self.compile_expression(&expr.rhs)?;
+                    self.compile_expression(&expr.lhs)?;
                     self.emit(Opcode::OpGreaterThan, &[]);
                     return Ok(());
                 }
 
-                self.compile_expr(&expr.lhs)?;
-                self.compile_expr(&expr.rhs)?;
+                self.compile_expression(&expr.lhs)?;
+                self.compile_expression(&expr.rhs)?;
 
                 match expr.operator {
                     Token::Plus => self.emit(Opcode::OpAdd, &[]),
@@ -135,8 +130,19 @@ impl Compiler {
                 };
                 Ok(())
             }
+            Expression::Boolean(expr) => {
+                match expr.value {
+                    true => {
+                        self.emit(Opcode::OpTrue, &[]);
+                    }
+                    false => {
+                        self.emit(Opcode::OpFalse, &[]);
+                    }
+                }
+                Ok(())
+            }
             Expression::If(expr) => {
-                self.compile_expr(&expr.condition)?;
+                self.compile_expression(&expr.condition)?;
 
                 // Placeholder operand value
                 let jump_cond_pos = self.emit(Opcode::OpJumpCond, &[-1]);
@@ -167,6 +173,27 @@ impl Compiler {
                 let after_alt_pos = self.instructions.stream.len();
                 self.update_operand(jump_pos, after_alt_pos as i32);
 
+                Ok(())
+            }
+            Expression::ArrayLiteral(expr) => {
+                for el in expr.elements.iter() {
+                    self.compile_expression(el)?;
+                }
+                self.emit(Opcode::OpArray, &[expr.elements.len() as i32]);
+                Ok(())
+            }
+            Expression::HashLiteral(expr) => {
+                for (k, v) in expr.pairs.iter() {
+                    self.compile_expression(k)?;
+                    self.compile_expression(v)?;
+                }
+                self.emit(Opcode::OpHash, &[(expr.pairs.len() * 2) as i32]);
+                Ok(())
+            }
+            Expression::Index(expr) => {
+                self.compile_expression(&expr.identifier)?;
+                self.compile_expression(&expr.index)?;
+                self.emit(Opcode::OpIndex, &[]);
                 Ok(())
             }
             _ => todo!(),

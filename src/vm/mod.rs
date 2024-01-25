@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
+
 use crate::{
     code::{Instructions, Opcode},
     compiler::Bytecode,
-    evaluator::object::Object,
+    evaluator::object::{HashKey, HashPair, Object},
 };
 
 mod test_vm;
@@ -54,7 +56,7 @@ impl Vm {
     pub fn run(&mut self) -> Result<(), RuntimeError> {
         let mut ip = 0;
         while ip < self.instructions.stream.len() {
-            let instr = self.instructions.stream[ip].to_owned();
+            let instr = self.instructions.stream[ip].clone();
             let op = &instr.0;
             let operands = &instr.1;
 
@@ -65,7 +67,7 @@ impl Vm {
                         self.push(self.constants[const_index].clone())?;
                     }
                     Err(..) => {
-                        return Err("error in instruction".to_owned());
+                        return Err("error in instruction".to_string());
                     }
                 },
                 Opcode::OpNull => {
@@ -98,7 +100,7 @@ impl Vm {
                         ip = jump_pos - 1;
                     }
                     Err(..) => {
-                        return Err("error in instruction".to_owned());
+                        return Err("error in instruction".to_string());
                     }
                 },
                 Opcode::OpJumpCond => match operands[..].try_into() {
@@ -111,7 +113,7 @@ impl Vm {
                         }
                     }
                     Err(..) => {
-                        return Err("error in instruction".to_owned());
+                        return Err("error in instruction".to_string());
                     }
                 },
                 Opcode::OpGetGlobal => match operands[..].try_into() {
@@ -121,7 +123,7 @@ impl Vm {
                         self.push(self.globals[global_index].clone())?;
                     }
                     Err(..) => {
-                        return Err("error in instruction".to_owned());
+                        return Err("error in instruction".to_string());
                     }
                 },
                 Opcode::OpSetGlobal => match operands[..].try_into() {
@@ -131,9 +133,41 @@ impl Vm {
                         self.globals[global_index] = self.pop();
                     }
                     Err(..) => {
-                        return Err("error in instruction".to_owned());
+                        return Err("error in instruction".to_string());
                     }
                 },
+                Opcode::OpArray => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let num_elements = u16::from_be_bytes(bytes) as usize;
+
+                        let new_sp = self.sp - num_elements;
+                        let array = self.build_array(new_sp, self.sp);
+                        self.sp = new_sp;
+                        self.push(array)?;
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_string());
+                    }
+                },
+                Opcode::OpHash => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let num_elements = u16::from_be_bytes(bytes) as usize;
+
+                        let new_sp = self.sp - num_elements;
+                        let hash = self.build_hash(new_sp, self.sp)?;
+                        self.sp = new_sp;
+                        self.push(hash)?;
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_string());
+                    }
+                },
+                Opcode::OpIndex => {
+                    let index = self.pop();
+                    let identifier = self.pop();
+
+                    self.execute_index_expression(&identifier, &index)?;
+                }
                 _ => todo!(),
             }
             ip += 1;
@@ -147,6 +181,9 @@ impl Vm {
         match (&lhs, &rhs) {
             (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
                 self.exec_integer_binary_operation(op, *lhs_value, *rhs_value)
+            }
+            (Object::String(lhs_value), Object::String(rhs_value)) => {
+                self.exec_string_binary_operation(op, lhs_value, rhs_value)
             }
             _ => Err(format!(
                 "unsupported types for binary operation: {} {}",
@@ -173,6 +210,23 @@ impl Vm {
         match result {
             Some(r) => self.push(Object::Integer(r)),
             None => Err(format!("unknown INTEGER operator: {:?}", op)),
+        }
+    }
+
+    fn exec_string_binary_operation(
+        &mut self,
+        op: &Opcode,
+        lhs: &str,
+        rhs: &str,
+    ) -> Result<(), RuntimeError> {
+        let result = match op {
+            Opcode::OpAdd => Some([lhs, rhs].join("")),
+            _ => None,
+        };
+
+        match result {
+            Some(r) => self.push(Object::String(r)),
+            None => Err(format!("unknown STRING operator: {:?}", op)),
         }
     }
 
@@ -250,13 +304,83 @@ impl Vm {
         }
     }
 
+    fn build_array(&self, start: usize, end: usize) -> Object {
+        let mut elements = vec![Object::Null; end - start];
+        elements.clone_from_slice(&self.stack[start..end]);
+
+        Object::Array(elements)
+    }
+
+    fn build_hash(&self, start: usize, end: usize) -> Result<Object, RuntimeError> {
+        let mut pairs = BTreeMap::new();
+        for i in (start..end).step_by(2) {
+            let key = self.stack[i].clone();
+            match key.get_hash_key() {
+                Some(hash_key) => {
+                    let value = self.stack[i + 1].clone();
+                    pairs.insert(hash_key, HashPair { key, value });
+                }
+                None => {
+                    return Err(format!("unusable as hash key: {}", key.get_type_str()));
+                }
+            }
+        }
+
+        Ok(Object::Hash(pairs))
+    }
+
+    fn execute_index_expression(
+        &mut self,
+        identifier: &Object,
+        index: &Object,
+    ) -> Result<(), RuntimeError> {
+        match (&identifier, &index) {
+            (Object::Array(array), Object::Integer(integer)) => {
+                self.execute_array_index_expression(array, *integer as usize)
+            }
+            (Object::Hash(hash), index) => self.execute_hash_index_expression(hash, index),
+            _ => Err(format!(
+                "index operator not supported: {}",
+                identifier.get_type_str()
+            )),
+        }
+    }
+
+    fn execute_array_index_expression(
+        &mut self,
+        array: &[Object],
+        index: usize,
+    ) -> Result<(), RuntimeError> {
+        if index >= array.len() {
+            return self.push(Object::Null);
+        }
+
+        self.push(array[index].clone())
+    }
+
+    fn execute_hash_index_expression(
+        &mut self,
+        hash: &BTreeMap<HashKey, HashPair>,
+        index: &Object,
+    ) -> Result<(), RuntimeError> {
+        if let Some(hash_key) = index.get_hash_key() {
+            if let Some(pair) = hash.get(&hash_key) {
+                self.push(pair.clone().value)
+            } else {
+                self.push(Object::Null)
+            }
+        } else {
+            Err(format!("unusable as hash key: {}", index.get_type_str()))
+        }
+    }
+
     pub fn last_popped(&self) -> Object {
         self.stack[self.sp].clone()
     }
 
     fn push(&mut self, obj: Object) -> Result<(), RuntimeError> {
         if self.sp > STACK_SIZE {
-            return Err("stack overflow".to_owned());
+            return Err("stack overflow".to_string());
         }
 
         self.stack[self.sp] = obj;

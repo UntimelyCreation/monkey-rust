@@ -253,4 +253,197 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_string_expressions() {
+        let inputs = ["\"monkey\"", "\"mon\" + \"key\""];
+        let expected_constants = [
+            vec![Object::String("monkey".to_string())],
+            vec![
+                Object::String("mon".to_string()),
+                Object::String("key".to_string()),
+            ],
+        ];
+        let expected_instrs = [
+            vec![make(Opcode::OpConstant, &[0]), make(Opcode::OpPop, &[])],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpAdd, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let inputs = ["[]", "[1, 2, 3]", "[1 + 2, 3 - 4, 5 * 6]"];
+        let expected_constants = [
+            vec![],
+            vec![Object::Integer(1), Object::Integer(2), Object::Integer(3)],
+            vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(3),
+                Object::Integer(4),
+                Object::Integer(5),
+                Object::Integer(6),
+            ],
+        ];
+        let expected_instrs = [
+            vec![make(Opcode::OpArray, &[0]), make(Opcode::OpPop, &[])],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpConstant, &[2]),
+                make(Opcode::OpArray, &[3]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpAdd, &[]),
+                make(Opcode::OpConstant, &[2]),
+                make(Opcode::OpConstant, &[3]),
+                make(Opcode::OpSub, &[]),
+                make(Opcode::OpConstant, &[4]),
+                make(Opcode::OpConstant, &[5]),
+                make(Opcode::OpMul, &[]),
+                make(Opcode::OpArray, &[3]),
+                make(Opcode::OpPop, &[]),
+            ],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let inputs = ["{}", "{1: 2, 3: 4, 5: 6}", "{1: 2 + 3, 4: 5 * 6}"];
+        let expected_constants = [
+            vec![],
+            vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(3),
+                Object::Integer(4),
+                Object::Integer(5),
+                Object::Integer(6),
+            ],
+            vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(3),
+                Object::Integer(4),
+                Object::Integer(5),
+                Object::Integer(6),
+            ],
+        ];
+        let expected_instrs = [
+            vec![make(Opcode::OpHash, &[0]), make(Opcode::OpPop, &[])],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpConstant, &[2]),
+                make(Opcode::OpConstant, &[3]),
+                make(Opcode::OpConstant, &[4]),
+                make(Opcode::OpConstant, &[5]),
+                make(Opcode::OpHash, &[6]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpConstant, &[2]),
+                make(Opcode::OpAdd, &[]),
+                make(Opcode::OpConstant, &[3]),
+                make(Opcode::OpConstant, &[4]),
+                make(Opcode::OpConstant, &[5]),
+                make(Opcode::OpMul, &[]),
+                make(Opcode::OpHash, &[4]),
+                make(Opcode::OpPop, &[]),
+            ],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        let inputs = ["[1, 2, 3][1 + 1]", "{1: 2}[2 - 1]"];
+        let expected_constants = [
+            vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(3),
+                Object::Integer(1),
+                Object::Integer(1),
+            ],
+            vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(2),
+                Object::Integer(1),
+            ],
+        ];
+        let expected_instrs = [
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpConstant, &[2]),
+                make(Opcode::OpArray, &[3]),
+                make(Opcode::OpConstant, &[3]),
+                make(Opcode::OpConstant, &[4]),
+                make(Opcode::OpAdd, &[]),
+                make(Opcode::OpIndex, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpHash, &[2]),
+                make(Opcode::OpConstant, &[2]),
+                make(Opcode::OpConstant, &[3]),
+                make(Opcode::OpSub, &[]),
+                make(Opcode::OpIndex, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
 }
