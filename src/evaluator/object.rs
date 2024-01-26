@@ -6,8 +6,8 @@ use std::{
     rc::Rc,
 };
 
-use crate::evaluator::environment::Environment;
 use crate::parser::ast::{fmt_identifier_expressions, BlockStatement, IdentifierExpression};
+use crate::{code::Instructions, evaluator::environment::Environment};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {
@@ -19,6 +19,9 @@ pub enum Object {
         parameters: Vec<IdentifierExpression>,
         body: BlockStatement,
         env: Rc<RefCell<Environment>>,
+    },
+    CompiledFunction {
+        instructions: Instructions,
     },
     Builtin(BuiltinFn),
     Array(Vec<Object>),
@@ -37,6 +40,7 @@ impl Object {
             Object::String(_) => "STRING".to_string(),
             Object::ReturnValue(_) => "RETURN".to_string(),
             Object::Function { .. } => "FUNCTION".to_string(),
+            Object::CompiledFunction { .. } => "COMPILED_FUNCTION".to_string(),
             Object::Builtin(_) => "BUILTIN".to_string(),
             Object::Array(_) => "ARRAY".to_string(),
             Object::Hash(_) => "HASH".to_string(),
@@ -95,6 +99,9 @@ impl Display for Object {
                     fmt_identifier_expressions(parameters, ", "),
                     body
                 )
+            }
+            Self::CompiledFunction { instructions } => {
+                write!(f, "CompiledFunction[{:p}]", instructions)
             }
             Self::Builtin(_) => write!(f, "builtin function"),
             Self::Array(elements) => write!(

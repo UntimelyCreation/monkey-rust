@@ -23,6 +23,9 @@ pub enum Opcode {
     OpArray,
     OpHash,
     OpIndex,
+    OpCall,
+    OpReturnValue,
+    OpReturn,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -142,6 +145,18 @@ pub fn lookup(op: &Opcode) -> Definition {
         },
         Opcode::OpIndex => Definition {
             name: "OpIndex",
+            operand_widths: vec![],
+        },
+        Opcode::OpCall => Definition {
+            name: "OpCall",
+            operand_widths: vec![],
+        },
+        Opcode::OpReturnValue => Definition {
+            name: "OpReturnValue",
+            operand_widths: vec![],
+        },
+        Opcode::OpReturn => Definition {
+            name: "OpReturn",
             operand_widths: vec![],
         },
     }

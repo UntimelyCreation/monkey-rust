@@ -446,4 +446,160 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_compilation_scopes() {
+        let mut compiler = Compiler::new();
+        assert_eq!(compiler.scope_index, 0);
+
+        compiler.emit(Opcode::OpMul, &[]);
+
+        compiler.enter_scope();
+        assert_eq!(compiler.scope_index, 1);
+
+        compiler.emit(Opcode::OpSub, &[]);
+        assert_eq!(compiler.current_instructions().stream.len(), 1);
+
+        let last = &compiler.scopes[compiler.scope_index].last_op;
+        assert_eq!(*last, Opcode::OpSub);
+
+        compiler.leave_scope();
+        assert_eq!(compiler.scope_index, 0);
+
+        compiler.emit(Opcode::OpAdd, &[]);
+        assert_eq!(compiler.current_instructions().stream.len(), 2);
+
+        let last = &compiler.scopes[compiler.scope_index].last_op;
+        let prev = &compiler.scopes[compiler.scope_index].prev_op;
+        assert_eq!(*last, Opcode::OpAdd);
+        assert_eq!(*prev, Opcode::OpMul);
+    }
+
+    #[test]
+    fn test_functions() {
+        let inputs = [
+            "fn() { return 5 + 10 }",
+            "fn() { 5 + 10 }",
+            "fn() { 1; 2 }",
+            "fn() { }",
+        ];
+        let expected_constants = [
+            vec![
+                Object::Integer(5),
+                Object::Integer(10),
+                Object::CompiledFunction {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpConstant, &[0]),
+                            make(Opcode::OpConstant, &[1]),
+                            make(Opcode::OpAdd, &[]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                },
+            ],
+            vec![
+                Object::Integer(5),
+                Object::Integer(10),
+                Object::CompiledFunction {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpConstant, &[0]),
+                            make(Opcode::OpConstant, &[1]),
+                            make(Opcode::OpAdd, &[]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                },
+            ],
+            vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::CompiledFunction {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpConstant, &[0]),
+                            make(Opcode::OpPop, &[]),
+                            make(Opcode::OpConstant, &[1]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                },
+            ],
+            vec![Object::CompiledFunction {
+                instructions: Instructions {
+                    stream: vec![make(Opcode::OpReturn, &[])],
+                },
+            }],
+        ];
+        let expected_instrs = [
+            vec![make(Opcode::OpConstant, &[2]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpConstant, &[2]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpConstant, &[2]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpConstant, &[0]), make(Opcode::OpPop, &[])],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn test_function_calls() {
+        let inputs = ["fn() { 24 }()", "let noArg = fn() { 24 }; noArg()"];
+        let expected_constants = [
+            vec![
+                Object::Integer(24),
+                Object::CompiledFunction {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpConstant, &[0]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                },
+            ],
+            vec![
+                Object::Integer(24),
+                Object::CompiledFunction {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpConstant, &[0]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                },
+            ],
+        ];
+        let expected_instrs = [
+            vec![
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpCall, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpSetGlobal, &[0]),
+                make(Opcode::OpGetGlobal, &[0]),
+                make(Opcode::OpCall, &[]),
+                make(Opcode::OpPop, &[]),
+            ],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
 }

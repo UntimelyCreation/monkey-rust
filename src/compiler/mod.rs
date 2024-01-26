@@ -13,13 +13,34 @@ mod test_symbol;
 
 type CompileError = String;
 
-pub struct Compiler {
+pub struct CompilationScope {
     instructions: Instructions,
+    last_op: Opcode,
+    prev_op: Opcode,
+}
+
+impl Default for CompilationScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CompilationScope {
+    pub fn new() -> Self {
+        Self {
+            instructions: Instructions::new(),
+            last_op: Opcode::OpNull,
+            prev_op: Opcode::OpNull,
+        }
+    }
+}
+
+pub struct Compiler {
     constants: Vec<Object>,
     symbol_table: SymbolTable,
 
-    last_op: Opcode,
-    prev_op: Opcode,
+    scopes: Vec<CompilationScope>,
+    scope_index: usize,
 }
 
 impl Default for Compiler {
@@ -30,12 +51,13 @@ impl Default for Compiler {
 
 impl Compiler {
     pub fn new() -> Self {
+        let main_scope = CompilationScope::new();
         Self {
-            instructions: Instructions::new(),
             constants: Vec::new(),
             symbol_table: SymbolTable::new(),
-            last_op: Opcode::OpPop,
-            prev_op: Opcode::OpPop,
+
+            scopes: vec![main_scope],
+            scope_index: 0,
         }
     }
 
@@ -67,12 +89,16 @@ impl Compiler {
                 self.emit(Opcode::OpSetGlobal, &[symbol.index as i32]);
                 Ok(())
             }
+            Statement::Return(stmt) => {
+                self.compile_expression(&stmt.value)?;
+                self.emit(Opcode::OpReturnValue, &[]);
+                Ok(())
+            }
             Statement::Expression(stmt) => {
                 self.compile_expression(&stmt.expr)?;
                 self.emit(Opcode::OpPop, &[]);
                 Ok(())
             }
-            _ => todo!(),
         }
     }
 
@@ -148,20 +174,20 @@ impl Compiler {
                 let jump_cond_pos = self.emit(Opcode::OpJumpCond, &[-1]);
 
                 self.compile_block_statement(&expr.consequence)?;
-                if self.last_op == Opcode::OpPop {
+                if self.last_instruction_is(Opcode::OpPop) {
                     self.remove_last_instr();
                 }
 
                 // Placeholder operand value
                 let jump_pos = self.emit(Opcode::OpJump, &[-1]);
 
-                let after_cons_pos = self.instructions.stream.len();
+                let after_cons_pos = self.current_instructions().stream.len();
                 self.update_operand(jump_cond_pos, after_cons_pos as i32);
 
                 match &expr.alternative {
                     Some(alternative) => {
                         self.compile_block_statement(alternative)?;
-                        if self.last_op == Opcode::OpPop {
+                        if self.last_instruction_is(Opcode::OpPop) {
                             self.remove_last_instr();
                         }
                     }
@@ -170,7 +196,7 @@ impl Compiler {
                     }
                 }
 
-                let after_alt_pos = self.instructions.stream.len();
+                let after_alt_pos = self.current_instructions().stream.len();
                 self.update_operand(jump_pos, after_alt_pos as i32);
 
                 Ok(())
@@ -196,13 +222,39 @@ impl Compiler {
                 self.emit(Opcode::OpIndex, &[]);
                 Ok(())
             }
+            Expression::FnLiteral(expr) => {
+                self.enter_scope();
+                self.compile_block_statement(&expr.body)?;
+
+                if self.last_instruction_is(Opcode::OpPop) {
+                    self.remove_last_instr();
+                    self.emit(Opcode::OpReturnValue, &[]);
+                }
+                if !self.last_instruction_is(Opcode::OpReturnValue) {
+                    self.emit(Opcode::OpReturn, &[]);
+                }
+
+                let instrs = self.leave_scope();
+
+                let compiled_fn_obj = Object::CompiledFunction {
+                    instructions: instrs,
+                };
+                let compiled_fn_pos = self.add_constant(compiled_fn_obj);
+                self.emit(Opcode::OpConstant, &[compiled_fn_pos as i32]);
+                Ok(())
+            }
+            Expression::Call(expr) => {
+                self.compile_expression(&expr.function)?;
+                self.emit(Opcode::OpCall, &[]);
+                Ok(())
+            }
             _ => todo!(),
         }
     }
 
     fn bytecode(&self) -> Bytecode {
         Bytecode {
-            instructions: self.instructions.clone(),
+            instructions: self.current_instructions().clone(),
             constants: self.constants.clone(),
         }
     }
@@ -216,32 +268,67 @@ impl Compiler {
         position
     }
 
+    fn current_instructions(&self) -> &Instructions {
+        &self.scopes[self.scope_index].instructions
+    }
+
+    fn current_instructions_mut(&mut self) -> &mut Instructions {
+        &mut self.scopes[self.scope_index].instructions
+    }
+
+    fn last_instruction_is(&self, op: Opcode) -> bool {
+        if self.current_instructions().stream.is_empty() {
+            return false;
+        }
+
+        self.scopes[self.scope_index].last_op == op
+    }
+
     fn add_instruction(&mut self, instruction: (Opcode, Vec<u8>)) -> usize {
-        let pos_new_instr = self.instructions.stream.len();
-        self.instructions.stream.push(instruction);
+        let pos_new_instr = self.current_instructions().stream.len();
+        self.current_instructions_mut().stream.push(instruction);
         pos_new_instr
     }
 
     fn set_last_op(&mut self, op: Opcode) {
-        self.prev_op = self.last_op.clone();
-        self.last_op = op;
+        let prev = self.scopes[self.scope_index].last_op.clone();
+
+        self.scopes[self.scope_index].prev_op = prev;
+        self.scopes[self.scope_index].last_op = op;
     }
 
     fn remove_last_instr(&mut self) {
-        self.instructions.stream.pop();
-        self.last_op = self.prev_op.clone();
+        let prev = self.scopes[self.scope_index].prev_op.clone();
+
+        self.current_instructions_mut().stream.pop();
+        self.scopes[self.scope_index].last_op = prev;
     }
 
     fn update_operand(&mut self, position: usize, operand: i32) {
-        let op = self.instructions.stream[position].0.clone();
+        let op = self.current_instructions().stream[position].0.clone();
         let new_instr = make(op, &[operand]);
 
-        self.instructions.stream[position] = new_instr;
+        self.current_instructions_mut().stream[position] = new_instr;
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {
         self.constants.push(obj);
         self.constants.len() - 1
+    }
+
+    fn enter_scope(&mut self) {
+        let scope = CompilationScope::new();
+        self.scopes.push(scope);
+        self.scope_index += 1;
+    }
+
+    fn leave_scope(&mut self) -> Instructions {
+        let instrs = self.current_instructions().clone();
+
+        self.scopes.pop();
+        self.scope_index -= 1;
+
+        instrs
     }
 }
 

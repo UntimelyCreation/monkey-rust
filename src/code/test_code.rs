@@ -26,6 +26,9 @@ mod tests {
             make(Opcode::OpArray, &[512]),
             make(Opcode::OpHash, &[524]),
             make(Opcode::OpIndex, &[]),
+            make(Opcode::OpCall, &[]),
+            make(Opcode::OpReturnValue, &[]),
+            make(Opcode::OpReturn, &[]),
         ];
         let expected_instrs = [
             (Opcode::OpConstant, vec![255, 254]),
@@ -49,6 +52,9 @@ mod tests {
             (Opcode::OpArray, vec![2, 0]),
             (Opcode::OpHash, vec![2, 12]),
             (Opcode::OpIndex, vec![]),
+            (Opcode::OpCall, vec![]),
+            (Opcode::OpReturnValue, vec![]),
+            (Opcode::OpReturn, vec![]),
         ];
 
         for (i, instr) in instructions.into_iter().enumerate() {
@@ -96,6 +102,12 @@ mod tests {
             parse(&lookup(&Opcode::OpArray), (Opcode::OpArray, vec![2, 0])),
             parse(&lookup(&Opcode::OpHash), (Opcode::OpHash, vec![2, 12])),
             parse(&lookup(&Opcode::OpIndex), (Opcode::OpIndex, vec![])),
+            parse(&lookup(&Opcode::OpCall), (Opcode::OpCall, vec![])),
+            parse(
+                &lookup(&Opcode::OpReturnValue),
+                (Opcode::OpReturnValue, vec![]),
+            ),
+            parse(&lookup(&Opcode::OpReturn), (Opcode::OpReturn, vec![])),
         ];
         let expected_operands = [
             (vec![65534], 2),
@@ -118,6 +130,9 @@ mod tests {
             (vec![6], 2),
             (vec![512], 2),
             (vec![524], 2),
+            (vec![], 0),
+            (vec![], 0),
+            (vec![], 0),
             (vec![], 0),
         ];
 
