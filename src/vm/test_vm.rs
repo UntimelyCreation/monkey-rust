@@ -313,4 +313,56 @@ mod tests {
             test_running(input, expected_objs[i].clone());
         }
     }
+
+    #[test]
+    fn test_functions_without_arguments() {
+        let inputs = [
+            "let fivePlusTen = fn() { 5 + 10; }; fivePlusTen();",
+            "let one = fn() { 1; }; let two = fn() { 2; }; one() + two()",
+            "let a = fn() { 1; }; let b = fn() { a() + 1 }; let c = fn() { b() + 1 }; c();",
+        ];
+        let expected_objs = vec![Object::Integer(15), Object::Integer(3), Object::Integer(3)];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_functions_with_return_statement() {
+        let inputs = [
+            "let earlyExit = fn() { return 99; 100; }; earlyExit();",
+            "let earlyExit = fn() { return 99; return 100; }; earlyExit();",
+        ];
+        let expected_objs = vec![Object::Integer(99), Object::Integer(99)];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_functions_without_return_value() {
+        let inputs = [
+            "let noReturn = fn() { }; noReturn();",
+            "let noReturn = fn() { }; let noReturnTwo = fn() { noReturn(); }; noReturn(); noReturnTwo();",
+        ];
+        let expected_objs = vec![Object::Null, Object::Null];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_first_class_functions() {
+        let inputs = [
+            "let returnsOne = fn() { 1; }; let returnsOneReturner = fn() { returnsOne; } returnsOneReturner()();",
+        ];
+        let expected_objs = vec![Object::Integer(1)];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
 }

@@ -9,6 +9,8 @@ use std::{
 use crate::parser::ast::{fmt_identifier_expressions, BlockStatement, IdentifierExpression};
 use crate::{code::Instructions, evaluator::environment::Environment};
 
+type BuiltinFn = fn(Vec<Object>) -> Object;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {
     Integer(i32),
@@ -20,17 +22,13 @@ pub enum Object {
         body: BlockStatement,
         env: Rc<RefCell<Environment>>,
     },
-    CompiledFunction {
-        instructions: Instructions,
-    },
+    CompiledFn(CompiledFn),
     Builtin(BuiltinFn),
     Array(Vec<Object>),
     Hash(BTreeMap<HashKey, HashPair>),
     Error(String),
     Null,
 }
-
-type BuiltinFn = fn(Vec<Object>) -> Object;
 
 impl Object {
     pub fn get_type_str(&self) -> String {
@@ -40,7 +38,7 @@ impl Object {
             Object::String(_) => "STRING".to_string(),
             Object::ReturnValue(_) => "RETURN".to_string(),
             Object::Function { .. } => "FUNCTION".to_string(),
-            Object::CompiledFunction { .. } => "COMPILED_FUNCTION".to_string(),
+            Object::CompiledFn { .. } => "COMPILED_FUNCTION".to_string(),
             Object::Builtin(_) => "BUILTIN".to_string(),
             Object::Array(_) => "ARRAY".to_string(),
             Object::Hash(_) => "HASH".to_string(),
@@ -100,8 +98,8 @@ impl Display for Object {
                     body
                 )
             }
-            Self::CompiledFunction { instructions } => {
-                write!(f, "CompiledFunction[{:p}]", instructions)
+            Self::CompiledFn(_) => {
+                write!(f, "compiled function")
             }
             Self::Builtin(_) => write!(f, "builtin function"),
             Self::Array(elements) => write!(
@@ -124,6 +122,25 @@ impl Display for Object {
             ),
             Self::Error(msg) => write!(f, "{}", msg),
             Self::Null => write!(f, "null"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct CompiledFn {
+    pub instructions: Instructions,
+}
+
+impl Default for CompiledFn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CompiledFn {
+    pub fn new() -> Self {
+        Self {
+            instructions: Instructions::new(),
         }
     }
 }

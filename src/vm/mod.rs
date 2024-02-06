@@ -3,22 +3,28 @@ use std::collections::BTreeMap;
 use crate::{
     code::{Instructions, Opcode},
     compiler::Bytecode,
-    evaluator::object::{HashKey, HashPair, Object},
+    evaluator::object::{CompiledFn, HashKey, HashPair, Object},
 };
 
+use self::frame::Frame;
+
+pub mod frame;
 mod test_vm;
 
 type RuntimeError = String;
 
 const STACK_SIZE: usize = 2048;
 pub const GLOBALS_SIZE: usize = 65535;
+const MAX_FRAMES: usize = 1024;
 
 pub struct Vm {
     constants: Vec<Object>,
-    instructions: Instructions,
     stack: Vec<Object>,
     sp: usize,
     globals: Vec<Object>,
+
+    frames: Vec<Frame>,
+    frames_idx: usize,
 }
 
 impl Default for Vm {
@@ -31,32 +37,62 @@ impl Vm {
     pub fn new() -> Self {
         Self {
             constants: Vec::new(),
-            instructions: Instructions::new(),
+
             stack: vec![Object::Null; STACK_SIZE],
             sp: 0,
+
             globals: vec![Object::Null; GLOBALS_SIZE],
+
+            frames: Vec::new(),
+            frames_idx: 1,
         }
     }
 
     pub fn from_bytecode(bytecode: Bytecode) -> Self {
+        let main_function = CompiledFn {
+            instructions: bytecode.instructions,
+        };
+        let main_frame = Frame::from_function(main_function);
+
+        let mut frames = vec![Frame::new(); MAX_FRAMES];
+        frames[0] = main_frame;
+
         Self {
             constants: bytecode.constants,
-            instructions: bytecode.instructions,
+
             stack: vec![Object::Null; STACK_SIZE],
             sp: 0,
+
             globals: vec![Object::Null; GLOBALS_SIZE],
+
+            frames,
+            frames_idx: 1,
         }
     }
 
     pub fn update(&mut self, bytecode: Bytecode) {
         self.constants = bytecode.constants;
-        self.instructions = bytecode.instructions;
+
+        let main_function = CompiledFn {
+            instructions: bytecode.instructions,
+        };
+        let main_frame = Frame::from_function(main_function);
+
+        let mut frames = vec![Frame::new(); MAX_FRAMES];
+        frames[0] = main_frame;
+
+        self.frames = frames;
+        self.frames_idx = 1;
     }
 
     pub fn run(&mut self) -> Result<(), RuntimeError> {
-        let mut ip = 0;
-        while ip < self.instructions.stream.len() {
-            let instr = self.instructions.stream[ip].clone();
+        while self.current_frame().ip
+            < (self.current_frame().instructions().stream.len() - 1) as i32
+        {
+            self.current_frame_mut().ip += 1;
+
+            let ip = self.current_frame().ip as usize;
+            let instr = self.current_frame().instructions().stream[ip].clone();
             let op = &instr.0;
             let operands = &instr.1;
 
@@ -64,26 +100,26 @@ impl Vm {
                 Opcode::OpConstant => match operands[..].try_into() {
                     Ok(bytes) => {
                         let const_index = u16::from_be_bytes(bytes) as usize;
-                        self.push(self.constants[const_index].clone())?;
+                        self.push_stack(self.constants[const_index].clone())?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
                     }
                 },
                 Opcode::OpNull => {
-                    self.push(Object::Null)?;
+                    self.push_stack(Object::Null)?;
                 }
                 Opcode::OpPop => {
-                    self.pop();
+                    self.pop_stack();
                 }
                 Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
                     self.exec_binary_operation(op)?;
                 }
                 Opcode::OpTrue => {
-                    self.push(Object::Boolean(true))?;
+                    self.push_stack(Object::Boolean(true))?;
                 }
                 Opcode::OpFalse => {
-                    self.push(Object::Boolean(false))?;
+                    self.push_stack(Object::Boolean(false))?;
                 }
                 Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
                     self.exec_comparison(op)?;
@@ -97,7 +133,7 @@ impl Vm {
                 Opcode::OpJump => match operands[..].try_into() {
                     Ok(bytes) => {
                         let jump_pos = u16::from_be_bytes(bytes) as usize;
-                        ip = jump_pos - 1;
+                        self.current_frame_mut().ip = (jump_pos - 1) as i32;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
@@ -107,9 +143,9 @@ impl Vm {
                     Ok(bytes) => {
                         let jump_pos = u16::from_be_bytes(bytes) as usize;
 
-                        let condition = self.pop();
+                        let condition = self.pop_stack();
                         if !condition.is_truthy() {
-                            ip = jump_pos - 1;
+                            self.current_frame_mut().ip = (jump_pos - 1) as i32;
                         }
                     }
                     Err(..) => {
@@ -120,7 +156,7 @@ impl Vm {
                     Ok(bytes) => {
                         let global_index = u16::from_be_bytes(bytes) as usize;
 
-                        self.push(self.globals[global_index].clone())?;
+                        self.push_stack(self.globals[global_index].clone())?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
@@ -130,7 +166,7 @@ impl Vm {
                     Ok(bytes) => {
                         let global_index = u16::from_be_bytes(bytes) as usize;
 
-                        self.globals[global_index] = self.pop();
+                        self.globals[global_index] = self.pop_stack();
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
@@ -143,7 +179,7 @@ impl Vm {
                         let new_sp = self.sp - num_elements;
                         let array = self.build_array(new_sp, self.sp);
                         self.sp = new_sp;
-                        self.push(array)?;
+                        self.push_stack(array)?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
@@ -156,28 +192,50 @@ impl Vm {
                         let new_sp = self.sp - num_elements;
                         let hash = self.build_hash(new_sp, self.sp)?;
                         self.sp = new_sp;
-                        self.push(hash)?;
+                        self.push_stack(hash)?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
                     }
                 },
                 Opcode::OpIndex => {
-                    let index = self.pop();
-                    let identifier = self.pop();
+                    let index = self.pop_stack();
+                    let identifier = self.pop_stack();
 
                     self.execute_index_expression(&identifier, &index)?;
                 }
+                Opcode::OpCall => match &self.stack[self.sp - 1] {
+                    Object::CompiledFn(compiled_fn) => {
+                        let frame = Frame::from_function(compiled_fn.clone());
+                        self.push_frame(frame);
+                    }
+                    _ => {
+                        return Err("calling non-function".to_string());
+                    }
+                },
+                Opcode::OpReturnValue => {
+                    let return_value = self.pop_stack();
+
+                    self.pop_frame();
+                    self.pop_stack();
+
+                    self.push_stack(return_value)?;
+                }
+                Opcode::OpReturn => {
+                    self.pop_frame();
+                    self.pop_stack();
+
+                    self.push_stack(Object::Null)?;
+                }
                 _ => todo!(),
             }
-            ip += 1;
         }
         Ok(())
     }
 
     fn exec_binary_operation(&mut self, op: &Opcode) -> Result<(), RuntimeError> {
-        let rhs = self.pop();
-        let lhs = self.pop();
+        let rhs = self.pop_stack();
+        let lhs = self.pop_stack();
         match (&lhs, &rhs) {
             (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
                 self.exec_integer_binary_operation(op, *lhs_value, *rhs_value)
@@ -208,7 +266,7 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push(Object::Integer(r)),
+            Some(r) => self.push_stack(Object::Integer(r)),
             None => Err(format!("unknown INTEGER operator: {:?}", op)),
         }
     }
@@ -225,14 +283,14 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push(Object::String(r)),
+            Some(r) => self.push_stack(Object::String(r)),
             None => Err(format!("unknown STRING operator: {:?}", op)),
         }
     }
 
     fn exec_comparison(&mut self, op: &Opcode) -> Result<(), RuntimeError> {
-        let rhs = self.pop();
-        let lhs = self.pop();
+        let rhs = self.pop_stack();
+        let lhs = self.pop_stack();
         match (&lhs, &rhs) {
             (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
                 self.exec_integer_comparison(op, *lhs_value, *rhs_value)
@@ -262,7 +320,7 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push(Object::Boolean(r)),
+            Some(r) => self.push_stack(Object::Boolean(r)),
             None => Err(format!("unknown INTEGER operator: {:?}", op)),
         }
     }
@@ -280,15 +338,15 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push(Object::Boolean(r)),
+            Some(r) => self.push_stack(Object::Boolean(r)),
             None => Err(format!("unknown BOOLEAN operator: {:?}", op)),
         }
     }
 
     fn exec_minus_operator(&mut self) -> Result<(), RuntimeError> {
-        let operand = self.pop();
+        let operand = self.pop_stack();
         match operand {
-            Object::Integer(value) => self.push(Object::Integer(-value)),
+            Object::Integer(value) => self.push_stack(Object::Integer(-value)),
             _ => Err(format!(
                 "unsupported type for negation: {}",
                 operand.get_type_str()
@@ -297,10 +355,10 @@ impl Vm {
     }
 
     fn exec_bang_operator(&mut self) -> Result<(), RuntimeError> {
-        match self.pop() {
-            Object::Boolean(value) => self.push(Object::Boolean(!value)),
-            Object::Null => self.push(Object::Boolean(true)),
-            _ => self.push(Object::Boolean(false)),
+        match self.pop_stack() {
+            Object::Boolean(value) => self.push_stack(Object::Boolean(!value)),
+            Object::Null => self.push_stack(Object::Boolean(true)),
+            _ => self.push_stack(Object::Boolean(false)),
         }
     }
 
@@ -352,10 +410,10 @@ impl Vm {
         index: usize,
     ) -> Result<(), RuntimeError> {
         if index >= array.len() {
-            return self.push(Object::Null);
+            return self.push_stack(Object::Null);
         }
 
-        self.push(array[index].clone())
+        self.push_stack(array[index].clone())
     }
 
     fn execute_hash_index_expression(
@@ -365,9 +423,9 @@ impl Vm {
     ) -> Result<(), RuntimeError> {
         if let Some(hash_key) = index.get_hash_key() {
             if let Some(pair) = hash.get(&hash_key) {
-                self.push(pair.clone().value)
+                self.push_stack(pair.clone().value)
             } else {
-                self.push(Object::Null)
+                self.push_stack(Object::Null)
             }
         } else {
             Err(format!("unusable as hash key: {}", index.get_type_str()))
@@ -378,7 +436,7 @@ impl Vm {
         self.stack[self.sp].clone()
     }
 
-    fn push(&mut self, obj: Object) -> Result<(), RuntimeError> {
+    fn push_stack(&mut self, obj: Object) -> Result<(), RuntimeError> {
         if self.sp > STACK_SIZE {
             return Err("stack overflow".to_string());
         }
@@ -388,9 +446,27 @@ impl Vm {
         Ok(())
     }
 
-    fn pop(&mut self) -> Object {
+    fn pop_stack(&mut self) -> Object {
         let obj = self.stack[self.sp - 1].clone();
         self.sp -= 1;
         obj
+    }
+
+    fn current_frame(&self) -> &Frame {
+        &self.frames[self.frames_idx - 1]
+    }
+
+    fn current_frame_mut(&mut self) -> &mut Frame {
+        &mut self.frames[self.frames_idx - 1]
+    }
+
+    fn push_frame(&mut self, frame: Frame) {
+        self.frames[self.frames_idx] = frame;
+        self.frames_idx += 1;
+    }
+
+    fn pop_frame(&mut self) -> Frame {
+        self.frames_idx -= 1;
+        self.frames[self.frames_idx].clone()
     }
 }

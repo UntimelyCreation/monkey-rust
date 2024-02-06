@@ -3,7 +3,7 @@ mod tests {
     use crate::{
         code::{make, Instructions, Opcode},
         compiler::Compiler,
-        evaluator::object::Object,
+        evaluator::object::{CompiledFn, Object},
         parser::parse,
     };
 
@@ -487,7 +487,7 @@ mod tests {
             vec![
                 Object::Integer(5),
                 Object::Integer(10),
-                Object::CompiledFunction {
+                Object::CompiledFn(CompiledFn {
                     instructions: Instructions {
                         stream: vec![
                             make(Opcode::OpConstant, &[0]),
@@ -496,12 +496,12 @@ mod tests {
                             make(Opcode::OpReturnValue, &[]),
                         ],
                     },
-                },
+                }),
             ],
             vec![
                 Object::Integer(5),
                 Object::Integer(10),
-                Object::CompiledFunction {
+                Object::CompiledFn(CompiledFn {
                     instructions: Instructions {
                         stream: vec![
                             make(Opcode::OpConstant, &[0]),
@@ -510,12 +510,12 @@ mod tests {
                             make(Opcode::OpReturnValue, &[]),
                         ],
                     },
-                },
+                }),
             ],
             vec![
                 Object::Integer(1),
                 Object::Integer(2),
-                Object::CompiledFunction {
+                Object::CompiledFn(CompiledFn {
                     instructions: Instructions {
                         stream: vec![
                             make(Opcode::OpConstant, &[0]),
@@ -524,13 +524,13 @@ mod tests {
                             make(Opcode::OpReturnValue, &[]),
                         ],
                     },
-                },
+                }),
             ],
-            vec![Object::CompiledFunction {
+            vec![Object::CompiledFn(CompiledFn {
                 instructions: Instructions {
                     stream: vec![make(Opcode::OpReturn, &[])],
                 },
-            }],
+            })],
         ];
         let expected_instrs = [
             vec![make(Opcode::OpConstant, &[2]), make(Opcode::OpPop, &[])],
@@ -556,25 +556,25 @@ mod tests {
         let expected_constants = [
             vec![
                 Object::Integer(24),
-                Object::CompiledFunction {
+                Object::CompiledFn(CompiledFn {
                     instructions: Instructions {
                         stream: vec![
                             make(Opcode::OpConstant, &[0]),
                             make(Opcode::OpReturnValue, &[]),
                         ],
                     },
-                },
+                }),
             ],
             vec![
                 Object::Integer(24),
-                Object::CompiledFunction {
+                Object::CompiledFn(CompiledFn {
                     instructions: Instructions {
                         stream: vec![
                             make(Opcode::OpConstant, &[0]),
                             make(Opcode::OpReturnValue, &[]),
                         ],
                     },
-                },
+                }),
             ],
         ];
         let expected_instrs = [

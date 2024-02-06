@@ -1,6 +1,6 @@
 use crate::{
     code::{make, Instructions, Opcode},
-    evaluator::object::Object,
+    evaluator::object::{CompiledFn, Object},
     lexer::token::Token,
     parser::ast::{BlockStatement, Expression, Node, Statement},
 };
@@ -236,9 +236,9 @@ impl Compiler {
 
                 let instrs = self.leave_scope();
 
-                let compiled_fn_obj = Object::CompiledFunction {
+                let compiled_fn_obj = Object::CompiledFn(CompiledFn {
                     instructions: instrs,
-                };
+                });
                 let compiled_fn_pos = self.add_constant(compiled_fn_obj);
                 self.emit(Opcode::OpConstant, &[compiled_fn_pos as i32]);
                 Ok(())
