@@ -5,7 +5,7 @@ use crate::{
     parser::ast::{BlockStatement, Expression, Node, Statement},
 };
 
-use self::symbol::SymbolTable;
+use self::symbol::{SymbolScope, SymbolTable};
 
 pub mod symbol;
 mod test_compiler;
@@ -86,7 +86,13 @@ impl Compiler {
             Statement::Let(stmt) => {
                 self.compile_expression(&stmt.value)?;
                 let symbol = self.symbol_table.define(stmt.identifier.name.clone());
-                self.emit(Opcode::OpSetGlobal, &[symbol.index as i32]);
+                self.emit(
+                    match &symbol.scope {
+                        SymbolScope::Global => Opcode::OpSetGlobal,
+                        SymbolScope::Local => Opcode::OpSetLocal,
+                    },
+                    &[symbol.index as i32],
+                );
                 Ok(())
             }
             Statement::Return(stmt) => {
@@ -106,7 +112,13 @@ impl Compiler {
         match expr {
             Expression::Identifier(expr) => {
                 match self.symbol_table.resolve(&expr.name) {
-                    Some(symbol) => self.emit(Opcode::OpGetGlobal, &[symbol.index as i32]),
+                    Some(symbol) => self.emit(
+                        match &symbol.scope {
+                            SymbolScope::Global => Opcode::OpGetGlobal,
+                            SymbolScope::Local => Opcode::OpGetLocal,
+                        },
+                        &[symbol.index as i32],
+                    ),
                     None => return Err(format!("undefined variable: {}", expr.name)),
                 };
                 Ok(())
@@ -234,10 +246,13 @@ impl Compiler {
                     self.emit(Opcode::OpReturn, &[]);
                 }
 
+                let num_locals = self.symbol_table.num_definitions;
+
                 let instrs = self.leave_scope();
 
                 let compiled_fn_obj = Object::CompiledFn(CompiledFn {
                     instructions: instrs,
+                    num_locals,
                 });
                 let compiled_fn_pos = self.add_constant(compiled_fn_obj);
                 self.emit(Opcode::OpConstant, &[compiled_fn_pos as i32]);
@@ -320,6 +335,8 @@ impl Compiler {
         let scope = CompilationScope::new();
         self.scopes.push(scope);
         self.scope_index += 1;
+
+        self.symbol_table = SymbolTable::new_enclosed(self.symbol_table.clone());
     }
 
     fn leave_scope(&mut self) -> Instructions {
@@ -327,6 +344,10 @@ impl Compiler {
 
         self.scopes.pop();
         self.scope_index -= 1;
+
+        if let Some(outer) = &self.symbol_table.outer {
+            self.symbol_table = outer.as_ref().clone();
+        }
 
         instrs
     }

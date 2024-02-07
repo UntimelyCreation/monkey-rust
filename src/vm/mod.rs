@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    code::{Instructions, Opcode},
+    code::Opcode,
     compiler::Bytecode,
     evaluator::object::{CompiledFn, HashKey, HashPair, Object},
 };
@@ -51,8 +51,9 @@ impl Vm {
     pub fn from_bytecode(bytecode: Bytecode) -> Self {
         let main_function = CompiledFn {
             instructions: bytecode.instructions,
+            num_locals: 0,
         };
-        let main_frame = Frame::from_function(main_function);
+        let main_frame = Frame::from_function(main_function, 0);
 
         let mut frames = vec![Frame::new(); MAX_FRAMES];
         frames[0] = main_frame;
@@ -75,8 +76,9 @@ impl Vm {
 
         let main_function = CompiledFn {
             instructions: bytecode.instructions,
+            num_locals: 0,
         };
-        let main_frame = Frame::from_function(main_function);
+        let main_frame = Frame::from_function(main_function, 0);
 
         let mut frames = vec![Frame::new(); MAX_FRAMES];
         frames[0] = main_frame;
@@ -206,7 +208,8 @@ impl Vm {
                 }
                 Opcode::OpCall => match &self.stack[self.sp - 1] {
                     Object::CompiledFn(compiled_fn) => {
-                        let frame = Frame::from_function(compiled_fn.clone());
+                        let frame = Frame::from_function(compiled_fn.clone(), self.sp);
+                        self.sp = frame.base_pointer + compiled_fn.num_locals;
                         self.push_frame(frame);
                     }
                     _ => {
@@ -216,17 +219,39 @@ impl Vm {
                 Opcode::OpReturnValue => {
                     let return_value = self.pop_stack();
 
-                    self.pop_frame();
-                    self.pop_stack();
+                    let frame = self.pop_frame();
+                    self.sp = frame.base_pointer - 1;
 
                     self.push_stack(return_value)?;
                 }
                 Opcode::OpReturn => {
-                    self.pop_frame();
-                    self.pop_stack();
+                    let frame = self.pop_frame();
+                    self.sp = frame.base_pointer - 1;
 
                     self.push_stack(Object::Null)?;
                 }
+                Opcode::OpGetLocal => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let local_index = u8::from_be_bytes(bytes) as usize;
+
+                        let base_pointer = self.current_frame().base_pointer;
+                        self.push_stack(self.stack[base_pointer + local_index].clone())?;
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_string());
+                    }
+                },
+                Opcode::OpSetLocal => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let local_index = u8::from_be_bytes(bytes) as usize;
+
+                        let base_pointer = self.current_frame().base_pointer;
+                        self.stack[base_pointer + local_index] = self.pop_stack();
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_string());
+                    }
+                },
                 _ => todo!(),
             }
         }

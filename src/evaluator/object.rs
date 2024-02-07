@@ -129,6 +129,7 @@ impl Display for Object {
 #[derive(Debug, PartialEq, Clone)]
 pub struct CompiledFn {
     pub instructions: Instructions,
+    pub num_locals: usize,
 }
 
 impl Default for CompiledFn {
@@ -141,6 +142,7 @@ impl CompiledFn {
     pub fn new() -> Self {
         Self {
             instructions: Instructions::new(),
+            num_locals: 0,
         }
     }
 }

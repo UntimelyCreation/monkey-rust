@@ -357,9 +357,32 @@ mod tests {
     #[test]
     fn test_first_class_functions() {
         let inputs = [
-            "let returnsOne = fn() { 1; }; let returnsOneReturner = fn() { returnsOne; } returnsOneReturner()();",
+            "let returnsOne = fn() { 1; }; let returnsOneReturner = fn() { returnsOne; }; returnsOneReturner()();",
+            "let returnsOneReturner = fn() { let returnsOne = fn() { 1; }; returnsOne; }; returnsOneReturner()();"
         ];
-        let expected_objs = vec![Object::Integer(1)];
+        let expected_objs = vec![Object::Integer(1), Object::Integer(1)];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_function_calls_with_bindings() {
+        let inputs = [
+            "let one = fn() { let one = 1; one }; one();",
+            "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; }; oneAndTwo();",
+            "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; }; let threeAndFour = fn() { let three = 3; let four = 4; three + four; }; oneAndTwo() + threeAndFour();",
+            "let firstFoobar = fn() { let foobar = 50; foobar; }; let secondFoobar = fn() { let foobar = 100; foobar; }; firstFoobar() + secondFoobar();",
+            "let globalSeed = 50; let minusOne = fn() { let num = 1; globalSeed - num;}; let minusTwo = fn() { let num = 2; globalSeed - num; }; minusOne() + minusTwo();",
+        ];
+        let expected_objs = vec![
+            Object::Integer(1),
+            Object::Integer(3),
+            Object::Integer(10),
+            Object::Integer(150),
+            Object::Integer(97),
+        ];
 
         for (i, input) in inputs.iter().enumerate() {
             test_running(input, expected_objs[i].clone());

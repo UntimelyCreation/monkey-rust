@@ -3,6 +3,7 @@ use std::{collections::HashMap, rc::Rc};
 #[derive(Clone, Debug, PartialEq)]
 pub enum SymbolScope {
     Global,
+    Local,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -14,8 +15,9 @@ pub struct Symbol {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SymbolTable {
+    pub outer: Option<Rc<SymbolTable>>,
     store: HashMap<String, Rc<Symbol>>,
-    num_definitions: usize,
+    pub num_definitions: usize,
 }
 
 impl Default for SymbolTable {
@@ -27,15 +29,28 @@ impl Default for SymbolTable {
 impl SymbolTable {
     pub fn new() -> Self {
         Self {
+            outer: None,
+            store: HashMap::new(),
+            num_definitions: 0,
+        }
+    }
+
+    pub fn new_enclosed(outer: SymbolTable) -> Self {
+        Self {
+            outer: Some(Rc::new(outer)),
             store: HashMap::new(),
             num_definitions: 0,
         }
     }
 
     pub fn define(&mut self, name: String) -> Rc<Symbol> {
+        let scope = match self.outer {
+            Some(_) => SymbolScope::Local,
+            None => SymbolScope::Global,
+        };
         let symbol = Rc::new(Symbol {
             name: name.clone(),
-            scope: SymbolScope::Global,
+            scope,
             index: self.num_definitions,
         });
         self.store.insert(name.clone(), symbol.clone());
@@ -44,6 +59,12 @@ impl SymbolTable {
     }
 
     pub fn resolve(&self, name: &str) -> Option<Rc<Symbol>> {
-        self.store.get(name).cloned()
+        match self.store.get(name) {
+            Some(symbol) => Some(symbol).cloned(),
+            None => match &self.outer {
+                Some(outer) => outer.resolve(name),
+                None => None,
+            },
+        }
     }
 }

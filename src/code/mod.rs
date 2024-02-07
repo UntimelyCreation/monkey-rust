@@ -26,6 +26,8 @@ pub enum Opcode {
     OpCall,
     OpReturnValue,
     OpReturn,
+    OpGetLocal,
+    OpSetLocal,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -159,6 +161,14 @@ pub fn lookup(op: &Opcode) -> Definition {
             name: "OpReturn",
             operand_widths: vec![],
         },
+        Opcode::OpGetLocal => Definition {
+            name: "OpGetLocal",
+            operand_widths: vec![1],
+        },
+        Opcode::OpSetLocal => Definition {
+            name: "OpSetLocal",
+            operand_widths: vec![1],
+        },
     }
 }
 
@@ -174,6 +184,7 @@ pub fn make(op: Opcode, operands: &[i32]) -> (Opcode, Vec<u8>) {
         let width = definition.operand_widths[i];
         match width {
             2 => instr_operands[offset..(offset + 2)].copy_from_slice(&(*o as u16).to_be_bytes()),
+            1 => instr_operands[offset..(offset + 1)].copy_from_slice(&(*o as u8).to_be_bytes()),
             _ => todo!(),
         }
         offset += width;
@@ -191,6 +202,12 @@ pub fn parse(def: &Definition, instruction: (Opcode, Vec<u8>)) -> (Vec<i32>, usi
             2 => match instruction.1[offset..(offset + 2)].try_into() {
                 Ok(bytes) => {
                     operands[i] = u16::from_be_bytes(bytes) as i32;
+                }
+                Err(..) => todo!(),
+            },
+            1 => match instruction.1[offset..(offset + 1)].try_into() {
+                Ok(bytes) => {
+                    operands[i] = u8::from_be_bytes(bytes) as i32;
                 }
                 Err(..) => todo!(),
             },

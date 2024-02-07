@@ -4,6 +4,7 @@ use crate::{code::Instructions, evaluator::object::CompiledFn};
 pub struct Frame {
     pub function: CompiledFn,
     pub ip: i32,
+    pub base_pointer: usize,
 }
 
 impl Default for Frame {
@@ -17,11 +18,16 @@ impl Frame {
         Self {
             function: CompiledFn::new(),
             ip: -1,
+            base_pointer: 0,
         }
     }
 
-    pub fn from_function(function: CompiledFn) -> Self {
-        Self { function, ip: -1 }
+    pub fn from_function(function: CompiledFn, base_pointer: usize) -> Self {
+        Self {
+            function,
+            ip: -1,
+            base_pointer,
+        }
     }
 
     pub fn instructions(&self) -> Instructions {
