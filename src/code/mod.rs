@@ -151,7 +151,7 @@ pub fn lookup(op: &Opcode) -> Definition {
         },
         Opcode::OpCall => Definition {
             name: "OpCall",
-            operand_widths: vec![],
+            operand_widths: vec![1],
         },
         Opcode::OpReturnValue => Definition {
             name: "OpReturnValue",
@@ -185,7 +185,7 @@ pub fn make(op: Opcode, operands: &[i32]) -> (Opcode, Vec<u8>) {
         match width {
             2 => instr_operands[offset..(offset + 2)].copy_from_slice(&(*o as u16).to_be_bytes()),
             1 => instr_operands[offset..(offset + 1)].copy_from_slice(&(*o as u8).to_be_bytes()),
-            _ => todo!(),
+            _ => panic!("unsupported operand width: {}", width),
         }
         offset += width;
     }

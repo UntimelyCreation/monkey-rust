@@ -43,17 +43,17 @@ impl SymbolTable {
         }
     }
 
-    pub fn define(&mut self, name: String) -> Rc<Symbol> {
+    pub fn define(&mut self, name: &str) -> Rc<Symbol> {
         let scope = match self.outer {
             Some(_) => SymbolScope::Local,
             None => SymbolScope::Global,
         };
         let symbol = Rc::new(Symbol {
-            name: name.clone(),
+            name: name.to_string(),
             scope,
             index: self.num_definitions,
         });
-        self.store.insert(name.clone(), symbol.clone());
+        self.store.insert(name.to_string(), symbol.clone());
         self.num_definitions += 1;
         symbol.clone()
     }

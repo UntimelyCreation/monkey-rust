@@ -36,16 +36,16 @@ mod tests {
         };
 
         let mut global = SymbolTable::new();
-        let a = global.define("a".to_string());
-        let b = global.define("b".to_string());
+        let a = global.define("a");
+        let b = global.define("b");
 
         let mut first_local = SymbolTable::new_enclosed(global);
-        let c = first_local.define("c".to_string());
-        let d = first_local.define("d".to_string());
+        let c = first_local.define("c");
+        let d = first_local.define("d");
 
         let mut second_local = SymbolTable::new_enclosed(first_local);
-        let e = second_local.define("e".to_string());
-        let f = second_local.define("f".to_string());
+        let e = second_local.define("e");
+        let f = second_local.define("f");
 
         assert_eq!(*a, expected_a);
         assert_eq!(*b, expected_b);
@@ -73,8 +73,8 @@ mod tests {
         ];
 
         let mut global = SymbolTable::new();
-        global.define("a".to_string());
-        global.define("b".to_string());
+        global.define("a");
+        global.define("b");
 
         for expected in expected_symbols.into_iter() {
             let actual = global
@@ -110,12 +110,12 @@ mod tests {
         ];
 
         let mut global = SymbolTable::new();
-        global.define("a".to_string());
-        global.define("b".to_string());
+        global.define("a");
+        global.define("b");
 
         let mut local = SymbolTable::new_enclosed(global);
-        local.define("c".to_string());
-        local.define("d".to_string());
+        local.define("c");
+        local.define("d");
 
         for expected in expected_symbols.into_iter() {
             let actual = local
@@ -174,16 +174,16 @@ mod tests {
         ];
 
         let mut global = SymbolTable::new();
-        global.define("a".to_string());
-        global.define("b".to_string());
+        global.define("a");
+        global.define("b");
 
         let mut first_local = SymbolTable::new_enclosed(global);
-        first_local.define("c".to_string());
-        first_local.define("d".to_string());
+        first_local.define("c");
+        first_local.define("d");
 
         let mut second_local = SymbolTable::new_enclosed(first_local.clone());
-        second_local.define("e".to_string());
-        second_local.define("f".to_string());
+        second_local.define("e");
+        second_local.define("f");
 
         for expected in expected_symbols_first.into_iter() {
             let actual = first_local

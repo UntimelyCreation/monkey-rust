@@ -509,6 +509,7 @@ mod tests {
                         ],
                     },
                     num_locals: 0,
+                    num_parameters: 0,
                 }),
             ],
             vec![
@@ -524,6 +525,7 @@ mod tests {
                         ],
                     },
                     num_locals: 0,
+                    num_parameters: 0,
                 }),
             ],
             vec![
@@ -539,6 +541,7 @@ mod tests {
                         ],
                     },
                     num_locals: 0,
+                    num_parameters: 0,
                 }),
             ],
             vec![Object::CompiledFn(CompiledFn {
@@ -546,6 +549,7 @@ mod tests {
                     stream: vec![make(Opcode::OpReturn, &[])],
                 },
                 num_locals: 0,
+                num_parameters: 0,
             })],
         ];
         let expected_instrs = [
@@ -568,7 +572,12 @@ mod tests {
 
     #[test]
     fn test_function_calls() {
-        let inputs = ["fn() { 24 }()", "let noArg = fn() { 24 }; noArg()"];
+        let inputs = [
+            "fn() { 24 }()",
+            "let noArg = fn() { 24 }; noArg()",
+            "let oneArg = fn(a) { a }; oneArg(24);",
+            "let manyArg = fn(a, b, c) { a; b; c }; manyArg(24, 25, 26);",
+        ];
         let expected_constants = [
             vec![
                 Object::Integer(24),
@@ -580,6 +589,7 @@ mod tests {
                         ],
                     },
                     num_locals: 0,
+                    num_parameters: 0,
                 }),
             ],
             vec![
@@ -592,20 +602,71 @@ mod tests {
                         ],
                     },
                     num_locals: 0,
+                    num_parameters: 0,
                 }),
+            ],
+            vec![
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 1,
+                    num_parameters: 1,
+                }),
+                Object::Integer(24),
+            ],
+            vec![
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpPop, &[]),
+                            make(Opcode::OpGetLocal, &[1]),
+                            make(Opcode::OpPop, &[]),
+                            make(Opcode::OpGetLocal, &[2]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 3,
+                    num_parameters: 3,
+                }),
+                Object::Integer(24),
+                Object::Integer(25),
+                Object::Integer(26),
             ],
         ];
         let expected_instrs = [
             vec![
                 make(Opcode::OpConstant, &[1]),
-                make(Opcode::OpCall, &[]),
+                make(Opcode::OpCall, &[0]),
                 make(Opcode::OpPop, &[]),
             ],
             vec![
                 make(Opcode::OpConstant, &[1]),
                 make(Opcode::OpSetGlobal, &[0]),
                 make(Opcode::OpGetGlobal, &[0]),
-                make(Opcode::OpCall, &[]),
+                make(Opcode::OpCall, &[0]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpSetGlobal, &[0]),
+                make(Opcode::OpGetGlobal, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpCall, &[1]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpSetGlobal, &[0]),
+                make(Opcode::OpGetGlobal, &[0]),
+                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpConstant, &[2]),
+                make(Opcode::OpConstant, &[3]),
+                make(Opcode::OpCall, &[3]),
                 make(Opcode::OpPop, &[]),
             ],
         ];
@@ -639,6 +700,7 @@ mod tests {
                         ],
                     },
                     num_locals: 0,
+                    num_parameters: 0,
                 }),
             ],
             vec![
@@ -653,6 +715,7 @@ mod tests {
                         ],
                     },
                     num_locals: 1,
+                    num_parameters: 0,
                 }),
             ],
             vec![
@@ -672,6 +735,7 @@ mod tests {
                         ],
                     },
                     num_locals: 2,
+                    num_parameters: 0,
                 }),
             ],
         ];

@@ -130,6 +130,7 @@ impl Display for Object {
 pub struct CompiledFn {
     pub instructions: Instructions,
     pub num_locals: usize,
+    pub num_parameters: usize,
 }
 
 impl Default for CompiledFn {
@@ -143,6 +144,7 @@ impl CompiledFn {
         Self {
             instructions: Instructions::new(),
             num_locals: 0,
+            num_parameters: 0,
         }
     }
 }

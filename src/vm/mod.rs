@@ -52,6 +52,7 @@ impl Vm {
         let main_function = CompiledFn {
             instructions: bytecode.instructions,
             num_locals: 0,
+            num_parameters: 0,
         };
         let main_frame = Frame::from_function(main_function, 0);
 
@@ -77,6 +78,7 @@ impl Vm {
         let main_function = CompiledFn {
             instructions: bytecode.instructions,
             num_locals: 0,
+            num_parameters: 0,
         };
         let main_frame = Frame::from_function(main_function, 0);
 
@@ -206,14 +208,14 @@ impl Vm {
 
                     self.execute_index_expression(&identifier, &index)?;
                 }
-                Opcode::OpCall => match &self.stack[self.sp - 1] {
-                    Object::CompiledFn(compiled_fn) => {
-                        let frame = Frame::from_function(compiled_fn.clone(), self.sp);
-                        self.sp = frame.base_pointer + compiled_fn.num_locals;
-                        self.push_frame(frame);
+                Opcode::OpCall => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let num_args = u8::from_be_bytes(bytes) as usize;
+
+                        self.call_function(num_args)?;
                     }
-                    _ => {
-                        return Err("calling non-function".to_string());
+                    Err(..) => {
+                        return Err("error in instruction".to_string());
                     }
                 },
                 Opcode::OpReturnValue => {
@@ -454,6 +456,24 @@ impl Vm {
             }
         } else {
             Err(format!("unusable as hash key: {}", index.get_type_str()))
+        }
+    }
+
+    fn call_function(&mut self, num_args: usize) -> Result<(), RuntimeError> {
+        match &self.stack[self.sp - 1 - num_args] {
+            Object::CompiledFn(compiled_fn) => {
+                if num_args != compiled_fn.num_parameters {
+                    return Err(format!(
+                        "wrong number of arguments: expected {}, found {}",
+                        compiled_fn.num_parameters, num_args
+                    ));
+                }
+                let frame = Frame::from_function(compiled_fn.clone(), self.sp - num_args);
+                self.sp = frame.base_pointer + compiled_fn.num_locals;
+                self.push_frame(frame);
+                Ok(())
+            }
+            _ => Err("calling non-function".to_string()),
         }
     }
 

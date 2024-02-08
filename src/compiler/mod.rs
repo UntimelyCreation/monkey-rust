@@ -85,7 +85,7 @@ impl Compiler {
         match stmt {
             Statement::Let(stmt) => {
                 self.compile_expression(&stmt.value)?;
-                let symbol = self.symbol_table.define(stmt.identifier.name.clone());
+                let symbol = self.symbol_table.define(&stmt.identifier.name);
                 self.emit(
                     match &symbol.scope {
                         SymbolScope::Global => Opcode::OpSetGlobal,
@@ -236,6 +236,11 @@ impl Compiler {
             }
             Expression::FnLiteral(expr) => {
                 self.enter_scope();
+
+                for par in expr.parameters.iter() {
+                    self.symbol_table.define(&par.name);
+                }
+
                 self.compile_block_statement(&expr.body)?;
 
                 if self.last_instruction_is(Opcode::OpPop) {
@@ -253,6 +258,7 @@ impl Compiler {
                 let compiled_fn_obj = Object::CompiledFn(CompiledFn {
                     instructions: instrs,
                     num_locals,
+                    num_parameters: expr.parameters.len(),
                 });
                 let compiled_fn_pos = self.add_constant(compiled_fn_obj);
                 self.emit(Opcode::OpConstant, &[compiled_fn_pos as i32]);
@@ -260,10 +266,14 @@ impl Compiler {
             }
             Expression::Call(expr) => {
                 self.compile_expression(&expr.function)?;
-                self.emit(Opcode::OpCall, &[]);
+
+                for arg in expr.arguments.iter() {
+                    self.compile_expression(arg)?;
+                }
+
+                self.emit(Opcode::OpCall, &[expr.arguments.len() as i32]);
                 Ok(())
             }
-            _ => todo!(),
         }
     }
 
