@@ -1,4 +1,4 @@
-use crate::{code::Instructions, evaluator::object::CompiledFn};
+use crate::{code::Instructions, object::CompiledFn};
 
 #[derive(Debug, Clone)]
 pub struct Frame {

@@ -4,7 +4,7 @@ mod tests {
 
     use crate::{
         compiler::Compiler,
-        evaluator::object::{HashPair, Object},
+        object::{HashPair, Object},
         parser::parse,
         vm::Vm,
     };
@@ -438,6 +438,52 @@ mod tests {
                     expected_errs[i].0, expected_errs[i].1
                 ))
             );
+        }
+    }
+
+    #[test]
+    fn test_builtin_functions() {
+        let inputs = [
+            "len(\"\")",
+            "len(\"four\")",
+            "len(\"hello world\")",
+            "len(1)",
+            "len(\"one\", \"two\")",
+            "len([1, 2, 3])",
+            "len([])",
+            "first([1, 2, 3])",
+            "first(1)",
+            "last([1, 2, 3])",
+            "last([])",
+            "last(1)",
+            "rest([1, 2, 3])",
+            "rest([])",
+            "push([], 1)",
+            "push(1, 1)",
+            "puts(\"hello\", \"world!\")",
+        ];
+        let expected_objs = [
+            Object::Integer(0),
+            Object::Integer(4),
+            Object::Integer(11),
+            Object::Error("argument to 'len' not supported, found INTEGER".to_string()),
+            Object::Error("wrong number of arguments: expected 1, found 2".to_string()),
+            Object::Integer(3),
+            Object::Integer(0),
+            Object::Integer(1),
+            Object::Error("argument to 'first' must be ARRAY, found INTEGER".to_string()),
+            Object::Integer(3),
+            Object::Null,
+            Object::Error("argument to 'last' must be ARRAY, found INTEGER".to_string()),
+            Object::Array(vec![Object::Integer(2), Object::Integer(3)]),
+            Object::Null,
+            Object::Array(vec![Object::Integer(1)]),
+            Object::Error("argument to 'push' must be ARRAY, found INTEGER".to_string()),
+            Object::Null,
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
         }
     }
 }

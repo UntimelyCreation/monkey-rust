@@ -1,11 +1,11 @@
 use crate::{
     code::{make, Instructions, Opcode},
-    evaluator::object::{CompiledFn, Object},
     lexer::token::Token,
+    object::{builtins::BUILTINS, CompiledFn, Object},
     parser::ast::{BlockStatement, Expression, Node, Statement},
 };
 
-use self::symbol::{SymbolScope, SymbolTable};
+use self::symbol::{Symbol, SymbolScope, SymbolTable};
 
 pub mod symbol;
 mod test_compiler;
@@ -52,9 +52,15 @@ impl Default for Compiler {
 impl Compiler {
     pub fn new() -> Self {
         let main_scope = CompilationScope::new();
+
+        let mut symbol_table = SymbolTable::new();
+        for (i, (name, _)) in BUILTINS.iter().enumerate() {
+            symbol_table.define_builtin(i, name);
+        }
+
         Self {
             constants: Vec::new(),
-            symbol_table: SymbolTable::new(),
+            symbol_table,
 
             scopes: vec![main_scope],
             scope_index: 0,
@@ -90,6 +96,7 @@ impl Compiler {
                     match &symbol.scope {
                         SymbolScope::Global => Opcode::OpSetGlobal,
                         SymbolScope::Local => Opcode::OpSetLocal,
+                        _ => unreachable!(),
                     },
                     &[symbol.index as i32],
                 );
@@ -112,13 +119,7 @@ impl Compiler {
         match expr {
             Expression::Identifier(expr) => {
                 match self.symbol_table.resolve(&expr.name) {
-                    Some(symbol) => self.emit(
-                        match &symbol.scope {
-                            SymbolScope::Global => Opcode::OpGetGlobal,
-                            SymbolScope::Local => Opcode::OpGetLocal,
-                        },
-                        &[symbol.index as i32],
-                    ),
+                    Some(symbol) => self.load_symbol(&symbol),
                     None => return Err(format!("undefined variable: {}", expr.name)),
                 };
                 Ok(())
@@ -360,6 +361,17 @@ impl Compiler {
         }
 
         instrs
+    }
+
+    fn load_symbol(&mut self, symbol: &Symbol) {
+        self.emit(
+            match symbol.scope {
+                SymbolScope::Global => Opcode::OpGetGlobal,
+                SymbolScope::Local => Opcode::OpGetLocal,
+                SymbolScope::Builtin => Opcode::OpGetBuiltin,
+            },
+            &[symbol.index as i32],
+        );
     }
 }
 

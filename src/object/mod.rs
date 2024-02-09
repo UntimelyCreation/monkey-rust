@@ -9,7 +9,9 @@ use std::{
 use crate::parser::ast::{fmt_identifier_expressions, BlockStatement, IdentifierExpression};
 use crate::{code::Instructions, evaluator::environment::Environment};
 
-type BuiltinFn = fn(Vec<Object>) -> Object;
+use self::builtins::BuiltinFn;
+
+pub mod builtins;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {
@@ -23,7 +25,7 @@ pub enum Object {
         env: Rc<RefCell<Environment>>,
     },
     CompiledFn(CompiledFn),
-    Builtin(BuiltinFn),
+    BuiltinFn(BuiltinFn),
     Array(Vec<Object>),
     Hash(BTreeMap<HashKey, HashPair>),
     Error(String),
@@ -39,7 +41,7 @@ impl Object {
             Object::ReturnValue(_) => "RETURN".to_string(),
             Object::Function { .. } => "FUNCTION".to_string(),
             Object::CompiledFn { .. } => "COMPILED_FUNCTION".to_string(),
-            Object::Builtin(_) => "BUILTIN".to_string(),
+            Object::BuiltinFn(_) => "BUILTIN".to_string(),
             Object::Array(_) => "ARRAY".to_string(),
             Object::Hash(_) => "HASH".to_string(),
             Object::Error(_) => "ERROR".to_string(),
@@ -101,7 +103,7 @@ impl Display for Object {
             Self::CompiledFn(_) => {
                 write!(f, "compiled function")
             }
-            Self::Builtin(_) => write!(f, "builtin function"),
+            Self::BuiltinFn(_) => write!(f, "builtin function"),
             Self::Array(elements) => write!(
                 f,
                 "[{}]",
@@ -159,4 +161,20 @@ pub struct HashKey {
 pub struct HashPair {
     pub key: Object,
     pub value: Object,
+}
+
+pub fn new_error(message: String) -> Object {
+    Object::Error(message)
+}
+
+pub fn is_truthy(object: &Object) -> bool {
+    !matches!(object, Object::Boolean(false) | Object::Null)
+}
+
+pub fn get_bool_object(expr: bool) -> Object {
+    if expr {
+        Object::Boolean(true)
+    } else {
+        Object::Boolean(false)
+    }
 }

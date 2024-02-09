@@ -199,4 +199,47 @@ mod tests {
             assert_eq!(expected, *actual);
         }
     }
+
+    #[test]
+    fn test_define_resolve_builtins() {
+        let expected_symbols = [
+            Symbol {
+                name: "a".to_owned(),
+                scope: SymbolScope::Builtin,
+                index: 0,
+            },
+            Symbol {
+                name: "c".to_owned(),
+                scope: SymbolScope::Builtin,
+                index: 1,
+            },
+            Symbol {
+                name: "e".to_owned(),
+                scope: SymbolScope::Builtin,
+                index: 2,
+            },
+            Symbol {
+                name: "f".to_owned(),
+                scope: SymbolScope::Builtin,
+                index: 3,
+            },
+        ];
+
+        let mut global = SymbolTable::new();
+        for (i, symbol) in expected_symbols.iter().enumerate() {
+            global.define_builtin(i, &symbol.name);
+        }
+
+        let first_local = SymbolTable::new_enclosed(global.clone());
+        let second_local = SymbolTable::new_enclosed(first_local.clone());
+
+        for table in [global, first_local, second_local].iter() {
+            for expected in expected_symbols.iter() {
+                let actual = table
+                    .resolve(&expected.name)
+                    .expect("no symbol found in table");
+                assert_eq!(expected.clone(), *actual);
+            }
+        }
+    }
 }

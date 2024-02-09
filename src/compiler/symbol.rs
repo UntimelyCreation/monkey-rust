@@ -4,6 +4,7 @@ use std::{collections::HashMap, rc::Rc};
 pub enum SymbolScope {
     Global,
     Local,
+    Builtin,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -55,7 +56,17 @@ impl SymbolTable {
         });
         self.store.insert(name.to_string(), symbol.clone());
         self.num_definitions += 1;
-        symbol.clone()
+        symbol
+    }
+
+    pub fn define_builtin(&mut self, index: usize, name: &str) -> Rc<Symbol> {
+        let symbol = Rc::new(Symbol {
+            name: name.to_string(),
+            scope: SymbolScope::Builtin,
+            index,
+        });
+        self.store.insert(name.to_string(), symbol.clone());
+        symbol
     }
 
     pub fn resolve(&self, name: &str) -> Option<Rc<Symbol>> {

@@ -3,7 +3,10 @@ use std::collections::BTreeMap;
 use crate::{
     code::Opcode,
     compiler::Bytecode,
-    evaluator::object::{CompiledFn, HashKey, HashPair, Object},
+    object::{
+        builtins::{BuiltinFn, BUILTINS},
+        CompiledFn, HashKey, HashPair, Object,
+    },
 };
 
 use self::frame::Frame;
@@ -11,7 +14,7 @@ use self::frame::Frame;
 pub mod frame;
 mod test_vm;
 
-type RuntimeError = String;
+type VmError = String;
 
 const STACK_SIZE: usize = 2048;
 pub const GLOBALS_SIZE: usize = 65535;
@@ -89,7 +92,7 @@ impl Vm {
         self.frames_idx = 1;
     }
 
-    pub fn run(&mut self) -> Result<(), RuntimeError> {
+    pub fn run(&mut self) -> Result<(), VmError> {
         while self.current_frame().ip
             < (self.current_frame().instructions().stream.len() - 1) as i32
         {
@@ -212,7 +215,7 @@ impl Vm {
                     Ok(bytes) => {
                         let num_args = u8::from_be_bytes(bytes) as usize;
 
-                        self.call_function(num_args)?;
+                        self.execute_call(num_args)?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
@@ -254,13 +257,25 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
+                Opcode::OpGetBuiltin => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let builtin_index = u8::from_be_bytes(bytes) as usize;
+
+                        let definition = BUILTINS[builtin_index].1;
+
+                        self.push_stack(Object::BuiltinFn(definition))?;
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_string());
+                    }
+                },
                 _ => todo!(),
             }
         }
         Ok(())
     }
 
-    fn exec_binary_operation(&mut self, op: &Opcode) -> Result<(), RuntimeError> {
+    fn exec_binary_operation(&mut self, op: &Opcode) -> Result<(), VmError> {
         let rhs = self.pop_stack();
         let lhs = self.pop_stack();
         match (&lhs, &rhs) {
@@ -283,7 +298,7 @@ impl Vm {
         op: &Opcode,
         lhs: i32,
         rhs: i32,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), VmError> {
         let result = match op {
             Opcode::OpAdd => Some(lhs + rhs),
             Opcode::OpSub => Some(lhs - rhs),
@@ -303,7 +318,7 @@ impl Vm {
         op: &Opcode,
         lhs: &str,
         rhs: &str,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), VmError> {
         let result = match op {
             Opcode::OpAdd => Some([lhs, rhs].join("")),
             _ => None,
@@ -315,7 +330,7 @@ impl Vm {
         }
     }
 
-    fn exec_comparison(&mut self, op: &Opcode) -> Result<(), RuntimeError> {
+    fn exec_comparison(&mut self, op: &Opcode) -> Result<(), VmError> {
         let rhs = self.pop_stack();
         let lhs = self.pop_stack();
         match (&lhs, &rhs) {
@@ -333,12 +348,7 @@ impl Vm {
         }
     }
 
-    fn exec_integer_comparison(
-        &mut self,
-        op: &Opcode,
-        lhs: i32,
-        rhs: i32,
-    ) -> Result<(), RuntimeError> {
+    fn exec_integer_comparison(&mut self, op: &Opcode, lhs: i32, rhs: i32) -> Result<(), VmError> {
         let result = match op {
             Opcode::OpEqual => Some(lhs == rhs),
             Opcode::OpNotEqual => Some(lhs != rhs),
@@ -357,7 +367,7 @@ impl Vm {
         op: &Opcode,
         lhs: bool,
         rhs: bool,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), VmError> {
         let result = match op {
             Opcode::OpEqual => Some(lhs == rhs),
             Opcode::OpNotEqual => Some(lhs != rhs),
@@ -370,7 +380,7 @@ impl Vm {
         }
     }
 
-    fn exec_minus_operator(&mut self) -> Result<(), RuntimeError> {
+    fn exec_minus_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop_stack();
         match operand {
             Object::Integer(value) => self.push_stack(Object::Integer(-value)),
@@ -381,7 +391,7 @@ impl Vm {
         }
     }
 
-    fn exec_bang_operator(&mut self) -> Result<(), RuntimeError> {
+    fn exec_bang_operator(&mut self) -> Result<(), VmError> {
         match self.pop_stack() {
             Object::Boolean(value) => self.push_stack(Object::Boolean(!value)),
             Object::Null => self.push_stack(Object::Boolean(true)),
@@ -396,7 +406,7 @@ impl Vm {
         Object::Array(elements)
     }
 
-    fn build_hash(&self, start: usize, end: usize) -> Result<Object, RuntimeError> {
+    fn build_hash(&self, start: usize, end: usize) -> Result<Object, VmError> {
         let mut pairs = BTreeMap::new();
         for i in (start..end).step_by(2) {
             let key = self.stack[i].clone();
@@ -418,7 +428,7 @@ impl Vm {
         &mut self,
         identifier: &Object,
         index: &Object,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), VmError> {
         match (&identifier, &index) {
             (Object::Array(array), Object::Integer(integer)) => {
                 self.execute_array_index_expression(array, *integer as usize)
@@ -435,7 +445,7 @@ impl Vm {
         &mut self,
         array: &[Object],
         index: usize,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), VmError> {
         if index >= array.len() {
             return self.push_stack(Object::Null);
         }
@@ -447,7 +457,7 @@ impl Vm {
         &mut self,
         hash: &BTreeMap<HashKey, HashPair>,
         index: &Object,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), VmError> {
         if let Some(hash_key) = index.get_hash_key() {
             if let Some(pair) = hash.get(&hash_key) {
                 self.push_stack(pair.clone().value)
@@ -459,29 +469,43 @@ impl Vm {
         }
     }
 
-    fn call_function(&mut self, num_args: usize) -> Result<(), RuntimeError> {
+    fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
         match &self.stack[self.sp - 1 - num_args] {
-            Object::CompiledFn(compiled_fn) => {
-                if num_args != compiled_fn.num_parameters {
-                    return Err(format!(
-                        "wrong number of arguments: expected {}, found {}",
-                        compiled_fn.num_parameters, num_args
-                    ));
-                }
-                let frame = Frame::from_function(compiled_fn.clone(), self.sp - num_args);
-                self.sp = frame.base_pointer + compiled_fn.num_locals;
-                self.push_frame(frame);
-                Ok(())
-            }
+            Object::CompiledFn(compiled_fn) => self.call_function(compiled_fn.clone(), num_args),
+            Object::BuiltinFn(builtin_fn) => self.call_builtin(*builtin_fn, num_args),
             _ => Err("calling non-function".to_string()),
         }
+    }
+
+    fn call_function(&mut self, compiled_fn: CompiledFn, num_args: usize) -> Result<(), VmError> {
+        if num_args != compiled_fn.num_parameters {
+            return Err(format!(
+                "wrong number of arguments: expected {}, found {}",
+                compiled_fn.num_parameters, num_args
+            ));
+        }
+
+        let frame = Frame::from_function(compiled_fn.clone(), self.sp - num_args);
+        self.sp = frame.base_pointer + compiled_fn.num_locals;
+        self.push_frame(frame);
+
+        Ok(())
+    }
+
+    fn call_builtin(&mut self, builtin_fn: BuiltinFn, num_args: usize) -> Result<(), VmError> {
+        let args = &self.stack[self.sp - num_args..self.sp];
+
+        let result = builtin_fn(args.to_vec());
+        self.sp -= num_args + 1;
+
+        self.push_stack(result)
     }
 
     pub fn last_popped(&self) -> Object {
         self.stack[self.sp].clone()
     }
 
-    fn push_stack(&mut self, obj: Object) -> Result<(), RuntimeError> {
+    fn push_stack(&mut self, obj: Object) -> Result<(), VmError> {
         if self.sp > STACK_SIZE {
             return Err("stack overflow".to_string());
         }

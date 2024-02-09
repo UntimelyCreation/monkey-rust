@@ -5,7 +5,7 @@ mod tests {
     use crate::{
         code::{make, Instructions, Opcode},
         compiler::Compiler,
-        evaluator::object::{CompiledFn, Object},
+        object::{CompiledFn, Object},
         parser::parse,
     };
 
@@ -748,6 +748,50 @@ mod tests {
             ],
             vec![make(Opcode::OpConstant, &[1]), make(Opcode::OpPop, &[])],
             vec![make(Opcode::OpConstant, &[2]), make(Opcode::OpPop, &[])],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn test_builtin_functions() {
+        let inputs = ["len([]); push([], 1);", "fn() { len([]) };"];
+        let expected_constants = [
+            vec![Object::Integer(1)],
+            vec![Object::CompiledFn(CompiledFn {
+                instructions: Instructions {
+                    stream: vec![
+                        make(Opcode::OpGetBuiltin, &[0]),
+                        make(Opcode::OpArray, &[0]),
+                        make(Opcode::OpCall, &[1]),
+                        make(Opcode::OpReturnValue, &[]),
+                    ],
+                },
+                num_locals: 0,
+                num_parameters: 0,
+            })],
+        ];
+        let expected_instrs = [
+            vec![
+                make(Opcode::OpGetBuiltin, &[0]),
+                make(Opcode::OpArray, &[0]),
+                make(Opcode::OpCall, &[1]),
+                make(Opcode::OpPop, &[]),
+                make(Opcode::OpGetBuiltin, &[4]),
+                make(Opcode::OpArray, &[0]),
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpCall, &[2]),
+                make(Opcode::OpPop, &[]),
+            ],
+            vec![make(Opcode::OpConstant, &[0]), make(Opcode::OpPop, &[])],
         ];
 
         for (i, input) in inputs.iter().enumerate() {
