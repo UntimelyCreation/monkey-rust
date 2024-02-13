@@ -32,6 +32,8 @@ mod tests {
             make(Opcode::OpGetLocal, &[9]),
             make(Opcode::OpSetLocal, &[255]),
             make(Opcode::OpGetBuiltin, &[128]),
+            make(Opcode::OpClosure, &[65534, 255]),
+            make(Opcode::OpGetFree, &[19]),
         ];
         let expected_instrs = [
             (Opcode::OpConstant, vec![255, 254]),
@@ -61,6 +63,8 @@ mod tests {
             (Opcode::OpGetLocal, vec![9]),
             (Opcode::OpSetLocal, vec![255]),
             (Opcode::OpGetBuiltin, vec![128]),
+            (Opcode::OpClosure, vec![255, 254, 255]),
+            (Opcode::OpGetFree, vec![19]),
         ];
 
         for (i, instr) in instructions.into_iter().enumerate() {
@@ -123,6 +127,11 @@ mod tests {
                 &lookup(&Opcode::OpGetBuiltin),
                 (Opcode::OpGetBuiltin, vec![128]),
             ),
+            parse(
+                &lookup(&Opcode::OpClosure),
+                (Opcode::OpClosure, vec![255, 254, 255]),
+            ),
+            parse(&lookup(&Opcode::OpGetFree), (Opcode::OpGetFree, vec![19])),
         ];
         let expected_operands = [
             (vec![65534], 2),
@@ -152,6 +161,8 @@ mod tests {
             (vec![9], 1),
             (vec![255], 1),
             (vec![128], 1),
+            (vec![65534, 255], 3),
+            (vec![19], 1),
         ];
 
         for (i, operand) in operands.into_iter().enumerate() {

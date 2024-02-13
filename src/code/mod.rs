@@ -29,6 +29,8 @@ pub enum Opcode {
     OpGetLocal,
     OpSetLocal,
     OpGetBuiltin,
+    OpClosure,
+    OpGetFree,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -172,6 +174,14 @@ pub fn lookup(op: &Opcode) -> Definition {
         },
         Opcode::OpGetBuiltin => Definition {
             name: "OpSetLocal",
+            operand_widths: vec![1],
+        },
+        Opcode::OpClosure => Definition {
+            name: "OpClosure",
+            operand_widths: vec![2, 1],
+        },
+        Opcode::OpGetFree => Definition {
+            name: "OpGetFree",
             operand_widths: vec![1],
         },
     }

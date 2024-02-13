@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::{cell::RefCell, rc::Rc};
 
     use crate::{
         code::{make, Instructions, Opcode},
@@ -469,7 +469,7 @@ mod tests {
 
         assert_eq!(
             compiler.symbol_table.outer,
-            Some(Rc::new(global_symbol_table.clone()))
+            Some(Rc::new(RefCell::new(global_symbol_table.clone())))
         );
 
         compiler.leave_scope();
@@ -553,10 +553,10 @@ mod tests {
             })],
         ];
         let expected_instrs = [
-            vec![make(Opcode::OpConstant, &[2]), make(Opcode::OpPop, &[])],
-            vec![make(Opcode::OpConstant, &[2]), make(Opcode::OpPop, &[])],
-            vec![make(Opcode::OpConstant, &[2]), make(Opcode::OpPop, &[])],
-            vec![make(Opcode::OpConstant, &[0]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpClosure, &[2, 0]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpClosure, &[2, 0]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpClosure, &[2, 0]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpClosure, &[0, 0]), make(Opcode::OpPop, &[])],
         ];
 
         for (i, input) in inputs.iter().enumerate() {
@@ -640,19 +640,19 @@ mod tests {
         ];
         let expected_instrs = [
             vec![
-                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpClosure, &[1, 0]),
                 make(Opcode::OpCall, &[0]),
                 make(Opcode::OpPop, &[]),
             ],
             vec![
-                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpClosure, &[1, 0]),
                 make(Opcode::OpSetGlobal, &[0]),
                 make(Opcode::OpGetGlobal, &[0]),
                 make(Opcode::OpCall, &[0]),
                 make(Opcode::OpPop, &[]),
             ],
             vec![
-                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpClosure, &[0, 0]),
                 make(Opcode::OpSetGlobal, &[0]),
                 make(Opcode::OpGetGlobal, &[0]),
                 make(Opcode::OpConstant, &[1]),
@@ -660,7 +660,7 @@ mod tests {
                 make(Opcode::OpPop, &[]),
             ],
             vec![
-                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpClosure, &[0, 0]),
                 make(Opcode::OpSetGlobal, &[0]),
                 make(Opcode::OpGetGlobal, &[0]),
                 make(Opcode::OpConstant, &[1]),
@@ -743,11 +743,11 @@ mod tests {
             vec![
                 make(Opcode::OpConstant, &[0]),
                 make(Opcode::OpSetGlobal, &[0]),
-                make(Opcode::OpConstant, &[1]),
+                make(Opcode::OpClosure, &[1, 0]),
                 make(Opcode::OpPop, &[]),
             ],
-            vec![make(Opcode::OpConstant, &[1]), make(Opcode::OpPop, &[])],
-            vec![make(Opcode::OpConstant, &[2]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpClosure, &[1, 0]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpClosure, &[2, 0]), make(Opcode::OpPop, &[])],
         ];
 
         for (i, input) in inputs.iter().enumerate() {
@@ -791,7 +791,153 @@ mod tests {
                 make(Opcode::OpCall, &[2]),
                 make(Opcode::OpPop, &[]),
             ],
-            vec![make(Opcode::OpConstant, &[0]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpClosure, &[0, 0]), make(Opcode::OpPop, &[])],
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_compiling(
+                input,
+                expected_constants[i].clone(),
+                Instructions {
+                    stream: expected_instrs[i].clone(),
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn test_closures() {
+        let inputs = [
+            "fn(a) { fn (b) { a + b } }",
+            "fn(a) { fn (b) { fn (c) { a + b + c } } }",
+            "let global = 55; fn() { let a = 66; fn() { let b = 77; fn() { let c = 88; global + a + b + c; } } }"
+        ];
+        let expected_constants = [
+            vec![
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpGetFree, &[0]),
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpAdd, &[]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 1,
+                    num_parameters: 1,
+                }),
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpClosure, &[0, 1]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 1,
+                    num_parameters: 1,
+                }),
+            ],
+            vec![
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpGetFree, &[0]),
+                            make(Opcode::OpGetFree, &[1]),
+                            make(Opcode::OpAdd, &[]),
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpAdd, &[]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 1,
+                    num_parameters: 1,
+                }),
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpGetFree, &[0]),
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpClosure, &[0, 2]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 1,
+                    num_parameters: 1,
+                }),
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpClosure, &[1, 1]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 1,
+                    num_parameters: 1,
+                }),
+            ],
+            vec![
+                Object::Integer(55),
+                Object::Integer(66),
+                Object::Integer(77),
+                Object::Integer(88),
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpConstant, &[3]),
+                            make(Opcode::OpSetLocal, &[0]),
+                            make(Opcode::OpGetGlobal, &[0]),
+                            make(Opcode::OpGetFree, &[0]),
+                            make(Opcode::OpAdd, &[]),
+                            make(Opcode::OpGetFree, &[1]),
+                            make(Opcode::OpAdd, &[]),
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpAdd, &[]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 1,
+                    num_parameters: 0,
+                }),
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpConstant, &[2]),
+                            make(Opcode::OpSetLocal, &[0]),
+                            make(Opcode::OpGetFree, &[0]),
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpClosure, &[4, 2]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 1,
+                    num_parameters: 0,
+                }),
+                Object::CompiledFn(CompiledFn {
+                    instructions: Instructions {
+                        stream: vec![
+                            make(Opcode::OpConstant, &[1]),
+                            make(Opcode::OpSetLocal, &[0]),
+                            make(Opcode::OpGetLocal, &[0]),
+                            make(Opcode::OpClosure, &[5, 1]),
+                            make(Opcode::OpReturnValue, &[]),
+                        ],
+                    },
+                    num_locals: 1,
+                    num_parameters: 0,
+                }),
+            ],
+        ];
+        let expected_instrs = [
+            vec![make(Opcode::OpClosure, &[1, 0]), make(Opcode::OpPop, &[])],
+            vec![make(Opcode::OpClosure, &[2, 0]), make(Opcode::OpPop, &[])],
+            vec![
+                make(Opcode::OpConstant, &[0]),
+                make(Opcode::OpSetGlobal, &[0]),
+                make(Opcode::OpClosure, &[6, 0]),
+                make(Opcode::OpPop, &[]),
+            ],
         ];
 
         for (i, input) in inputs.iter().enumerate() {

@@ -1,8 +1,8 @@
-use crate::{code::Instructions, object::CompiledFn};
+use crate::{code::Instructions, object::Closure};
 
 #[derive(Debug, Clone)]
 pub struct Frame {
-    pub function: CompiledFn,
+    pub closure: Closure,
     pub ip: i32,
     pub base_pointer: usize,
 }
@@ -16,21 +16,21 @@ impl Default for Frame {
 impl Frame {
     pub fn new() -> Self {
         Self {
-            function: CompiledFn::new(),
+            closure: Closure::new(),
             ip: -1,
             base_pointer: 0,
         }
     }
 
-    pub fn from_function(function: CompiledFn, base_pointer: usize) -> Self {
+    pub fn from_function(closure: Closure, base_pointer: usize) -> Self {
         Self {
-            function,
+            closure,
             ip: -1,
             base_pointer,
         }
     }
 
     pub fn instructions(&self) -> Instructions {
-        self.function.instructions.clone()
+        self.closure.function.instructions.clone()
     }
 }

@@ -25,6 +25,7 @@ pub enum Object {
         env: Rc<RefCell<Environment>>,
     },
     CompiledFn(CompiledFn),
+    Closure(Closure),
     BuiltinFn(BuiltinFn),
     Array(Vec<Object>),
     Hash(BTreeMap<HashKey, HashPair>),
@@ -41,6 +42,7 @@ impl Object {
             Object::ReturnValue(_) => "RETURN".to_string(),
             Object::Function { .. } => "FUNCTION".to_string(),
             Object::CompiledFn { .. } => "COMPILED_FUNCTION".to_string(),
+            Object::Closure(..) => "CLOSURE".to_string(),
             Object::BuiltinFn(_) => "BUILTIN".to_string(),
             Object::Array(_) => "ARRAY".to_string(),
             Object::Hash(_) => "HASH".to_string(),
@@ -103,6 +105,9 @@ impl Display for Object {
             Self::CompiledFn(_) => {
                 write!(f, "compiled function")
             }
+            Self::Closure(_) => {
+                write!(f, "closure")
+            }
             Self::BuiltinFn(_) => write!(f, "builtin function"),
             Self::Array(elements) => write!(
                 f,
@@ -147,6 +152,27 @@ impl CompiledFn {
             instructions: Instructions::new(),
             num_locals: 0,
             num_parameters: 0,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Closure {
+    pub function: Rc<CompiledFn>,
+    pub free_vars: Vec<Object>,
+}
+
+impl Default for Closure {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Closure {
+    pub fn new() -> Self {
+        Self {
+            function: Rc::new(CompiledFn::new()),
+            free_vars: Vec::new(),
         }
     }
 }

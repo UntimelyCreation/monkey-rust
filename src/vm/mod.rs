@@ -1,11 +1,11 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, rc::Rc};
 
 use crate::{
     code::Opcode,
     compiler::Bytecode,
     object::{
         builtins::{BuiltinFn, BUILTINS},
-        CompiledFn, HashKey, HashPair, Object,
+        Closure, CompiledFn, HashKey, HashPair, Object,
     },
 };
 
@@ -57,7 +57,11 @@ impl Vm {
             num_locals: 0,
             num_parameters: 0,
         };
-        let main_frame = Frame::from_function(main_function, 0);
+        let main_closure = Closure {
+            function: Rc::new(main_function),
+            free_vars: Vec::new(),
+        };
+        let main_frame = Frame::from_function(main_closure, 0);
 
         let mut frames = vec![Frame::new(); MAX_FRAMES];
         frames[0] = main_frame;
@@ -83,7 +87,11 @@ impl Vm {
             num_locals: 0,
             num_parameters: 0,
         };
-        let main_frame = Frame::from_function(main_function, 0);
+        let main_closure = Closure {
+            function: Rc::new(main_function),
+            free_vars: Vec::new(),
+        };
+        let main_frame = Frame::from_function(main_closure, 0);
 
         let mut frames = vec![Frame::new(); MAX_FRAMES];
         frames[0] = main_frame;
@@ -264,6 +272,15 @@ impl Vm {
                         let definition = BUILTINS[builtin_index].1;
 
                         self.push_stack(Object::BuiltinFn(definition))?;
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_string());
+                    }
+                },
+                Opcode::OpClosure => match operands[..2].try_into() {
+                    Ok(bytes) => {
+                        let const_index = u16::from_be_bytes(bytes) as usize;
+                        self.push_closure(const_index)?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
@@ -471,22 +488,22 @@ impl Vm {
 
     fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
         match &self.stack[self.sp - 1 - num_args] {
-            Object::CompiledFn(compiled_fn) => self.call_function(compiled_fn.clone(), num_args),
+            Object::Closure(closure) => self.call_closure(closure.clone(), num_args),
             Object::BuiltinFn(builtin_fn) => self.call_builtin(*builtin_fn, num_args),
             _ => Err("calling non-function".to_string()),
         }
     }
 
-    fn call_function(&mut self, compiled_fn: CompiledFn, num_args: usize) -> Result<(), VmError> {
-        if num_args != compiled_fn.num_parameters {
+    fn call_closure(&mut self, closure: Closure, num_args: usize) -> Result<(), VmError> {
+        if num_args != closure.function.num_parameters {
             return Err(format!(
                 "wrong number of arguments: expected {}, found {}",
-                compiled_fn.num_parameters, num_args
+                closure.function.num_parameters, num_args
             ));
         }
 
-        let frame = Frame::from_function(compiled_fn.clone(), self.sp - num_args);
-        self.sp = frame.base_pointer + compiled_fn.num_locals;
+        let frame = Frame::from_function(closure.clone(), self.sp - num_args);
+        self.sp = frame.base_pointer + closure.function.num_locals;
         self.push_frame(frame);
 
         Ok(())
@@ -537,5 +554,19 @@ impl Vm {
     fn pop_frame(&mut self) -> Frame {
         self.frames_idx -= 1;
         self.frames[self.frames_idx].clone()
+    }
+
+    fn push_closure(&mut self, const_index: usize) -> Result<(), VmError> {
+        let constant = &self.constants[const_index];
+        match constant {
+            Object::CompiledFn(compiled_fn) => {
+                let closure = Object::Closure(Closure {
+                    function: Rc::new(compiled_fn.clone()),
+                    free_vars: Vec::new(),
+                });
+                self.push_stack(closure)
+            }
+            _ => Err(format!("not a function: {}", constant)),
+        }
     }
 }

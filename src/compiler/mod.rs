@@ -252,9 +252,13 @@ impl Compiler {
                     self.emit(Opcode::OpReturn, &[]);
                 }
 
+                let free_symbols = self.symbol_table.free_symbols.clone();
                 let num_locals = self.symbol_table.num_definitions;
-
                 let instrs = self.leave_scope();
+
+                for symbol in &free_symbols {
+                    self.load_symbol(symbol);
+                }
 
                 let compiled_fn_obj = Object::CompiledFn(CompiledFn {
                     instructions: instrs,
@@ -262,7 +266,10 @@ impl Compiler {
                     num_parameters: expr.parameters.len(),
                 });
                 let compiled_fn_pos = self.add_constant(compiled_fn_obj);
-                self.emit(Opcode::OpConstant, &[compiled_fn_pos as i32]);
+                self.emit(
+                    Opcode::OpClosure,
+                    &[compiled_fn_pos as i32, free_symbols.len() as i32],
+                );
                 Ok(())
             }
             Expression::Call(expr) => {
@@ -357,7 +364,8 @@ impl Compiler {
         self.scope_index -= 1;
 
         if let Some(outer) = &self.symbol_table.outer {
-            self.symbol_table = outer.as_ref().clone();
+            let outer = outer.as_ref().borrow().clone();
+            self.symbol_table = outer;
         }
 
         instrs
@@ -369,6 +377,7 @@ impl Compiler {
                 SymbolScope::Global => Opcode::OpGetGlobal,
                 SymbolScope::Local => Opcode::OpGetLocal,
                 SymbolScope::Builtin => Opcode::OpGetBuiltin,
+                SymbolScope::Free => Opcode::OpGetFree,
             },
             &[symbol.index as i32],
         );
