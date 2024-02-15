@@ -11,7 +11,7 @@ use monkey_rust::{
 
 const PROMPT: &str = ">> ";
 
-pub fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut compiler = Compiler::new();
     let mut vm = Vm::new();
 

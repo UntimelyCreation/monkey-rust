@@ -120,7 +120,12 @@ impl Display for Expression {
             },
             Expression::FnLiteral(expr) => write!(
                 f,
-                "fn({}) {{ {} }}",
+                "{} fn({}) {{ {} }}",
+                if expr.name.is_empty() {
+                    "".to_string()
+                } else {
+                    format!("<{}>", expr.name)
+                },
                 fmt_identifier_expressions(&expr.parameters, ", "),
                 expr.body
             ),
@@ -195,6 +200,7 @@ pub struct IfExpression {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct FnLiteralExpression {
+    pub name: String,
     pub parameters: Vec<IdentifierExpression>,
     pub body: BlockStatement,
 }

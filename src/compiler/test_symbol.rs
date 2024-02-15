@@ -391,4 +391,41 @@ mod tests {
             assert_eq!(second_local.resolve(name), None);
         }
     }
+
+    #[test]
+    fn test_define_resolve_function_name() {
+        let mut global = SymbolTable::new();
+        global.define_function("a");
+
+        let expected = Symbol {
+            name: "a".to_owned(),
+            scope: SymbolScope::Function,
+            index: 0,
+        };
+
+        let actual = global
+            .resolve(&expected.name)
+            .expect("no symbol found in table");
+
+        assert_eq!(expected, *actual);
+    }
+
+    #[test]
+    fn test_shadowing_function_name() {
+        let mut global = SymbolTable::new();
+        global.define_function("a");
+        global.define("a");
+
+        let expected = Symbol {
+            name: "a".to_owned(),
+            scope: SymbolScope::Global,
+            index: 0,
+        };
+
+        let actual = global
+            .resolve(&expected.name)
+            .expect("no symbol found in table");
+
+        assert_eq!(expected, *actual);
+    }
 }

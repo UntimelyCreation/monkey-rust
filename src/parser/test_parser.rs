@@ -293,6 +293,7 @@ return x;";
 
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::FnLiteral(FnLiteralExpression {
+                name: "".to_string(),
                 parameters: vec![
                     IdentifierExpression {
                         name: "x".to_string(),
@@ -340,6 +341,7 @@ return x;";
         for (i, input) in inputs.iter().enumerate() {
             let expected = vec![Statement::Expression(ExpressionStatement {
                 expr: Expression::FnLiteral(FnLiteralExpression {
+                    name: "".to_string(),
                     parameters: expected_parameters[i].clone(),
                     body: BlockStatement { statements: vec![] },
                 }),

@@ -280,13 +280,35 @@ impl Vm {
                 Opcode::OpClosure => match operands[..2].try_into() {
                     Ok(bytes) => {
                         let const_index = u16::from_be_bytes(bytes) as usize;
-                        self.push_closure(const_index)?;
+                        match operands[2..].try_into() {
+                            Ok(bytes) => {
+                                let num_free = u8::from_be_bytes(bytes) as usize;
+                                self.push_closure(const_index, num_free)?;
+                            }
+                            Err(..) => {
+                                return Err("error in instruction".to_string());
+                            }
+                        }
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
                     }
                 },
-                _ => todo!(),
+                Opcode::OpGetFree => match operands[..].try_into() {
+                    Ok(bytes) => {
+                        let free_index = u8::from_be_bytes(bytes) as usize;
+
+                        let current_closure = &self.current_frame().closure;
+                        self.push_stack(current_closure.free_vars[free_index].clone())?;
+                    }
+                    Err(..) => {
+                        return Err("error in instruction".to_string());
+                    }
+                },
+                Opcode::OpCurrentClosure => {
+                    let current_closure = self.current_frame().closure.clone();
+                    self.push_stack(Object::Closure(current_closure))?;
+                }
             }
         }
         Ok(())
@@ -556,13 +578,17 @@ impl Vm {
         self.frames[self.frames_idx].clone()
     }
 
-    fn push_closure(&mut self, const_index: usize) -> Result<(), VmError> {
+    fn push_closure(&mut self, const_index: usize, num_free: usize) -> Result<(), VmError> {
         let constant = &self.constants[const_index];
         match constant {
             Object::CompiledFn(compiled_fn) => {
+                let mut free_vars = vec![Object::Null; num_free];
+                free_vars.clone_from_slice(&self.stack[self.sp - num_free..self.sp]);
+                self.sp -= num_free;
+
                 let closure = Object::Closure(Closure {
                     function: Rc::new(compiled_fn.clone()),
-                    free_vars: Vec::new(),
+                    free_vars,
                 });
                 self.push_stack(closure)
             }

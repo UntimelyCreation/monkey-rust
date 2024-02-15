@@ -486,4 +486,54 @@ mod tests {
             test_running(input, expected_objs[i].clone());
         }
     }
+
+    #[test]
+    fn test_closures() {
+        let inputs = [
+            "let newClosure = fn(a) { fn() { a; }; }; let closure = newClosure(99); closure();", 
+            "let newAdder = fn(a, b) { fn(c) { a + b + c }; }; let adder = newAdder(1, 2); adder(8);",
+            "let newAdder = fn(a, b) { let c = a + b; fn(d) { c + d }; }; let adder = newAdder(1, 2); adder(8);",
+            "let newAdderOuter = fn(a, b) { let c = a + b; fn(d) { let e = d + c; fn(f) { e + f; }; }; }; let newAdderInner = newAdderOuter(1, 2); let adder = newAdderInner(3); adder(8);",
+            "let a = 1; let newAdderOuter = fn(b) { fn(c) { fn(d) { a + b + c + d }; }; }; let newAdderInner = newAdderOuter(2); let adder = newAdderInner(3); adder(8);",
+            "let newClosure = fn(a, b) { let one = fn() { a; }; let two = fn() { b; }; fn() { one() + two(); }; }; let closure = newClosure(9, 90); closure();"
+        ];
+        let expected_objs = [
+            Object::Integer(99),
+            Object::Integer(11),
+            Object::Integer(11),
+            Object::Integer(14),
+            Object::Integer(14),
+            Object::Integer(99),
+        ];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_recursive_functions() {
+        let inputs = [
+            "let countDown = fn(x) { if (x == 0) { return 0; } else { countDown(x - 1); } }; countDown(1);", 
+            "let countDown = fn(x) { if (x == 0) { return 0; } else { countDown(x - 1); } }; let wrapper = fn() { countDown(1) }; wrapper();", 
+            "let wrapper = fn() { let countDown = fn(x) { if (x == 0) { return 0; } else { countDown(x - 1); } }; countDown(1); }; wrapper();",
+        ];
+        let expected_objs = [Object::Integer(0), Object::Integer(0), Object::Integer(0)];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
+
+    #[test]
+    fn test_recursive_fibonacci() {
+        let inputs = [
+            "let fibonacci = fn(x) { if (x == 0) { return 0; } else { if (x == 1) { return 1; } else { fibonacci(x - 1) + fibonacci(x - 2); } } }; fibonacci(15);"
+        ];
+        let expected_objs = [Object::Integer(610)];
+
+        for (i, input) in inputs.iter().enumerate() {
+            test_running(input, expected_objs[i].clone());
+        }
+    }
 }

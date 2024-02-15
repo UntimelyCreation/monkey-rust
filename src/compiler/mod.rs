@@ -90,8 +90,9 @@ impl Compiler {
     fn compile_stmt(&mut self, stmt: &Statement) -> Result<(), CompileError> {
         match stmt {
             Statement::Let(stmt) => {
-                self.compile_expression(&stmt.value)?;
                 let symbol = self.symbol_table.define(&stmt.identifier.name);
+                self.compile_expression(&stmt.value)?;
+
                 self.emit(
                     match &symbol.scope {
                         SymbolScope::Global => Opcode::OpSetGlobal,
@@ -238,6 +239,10 @@ impl Compiler {
             Expression::FnLiteral(expr) => {
                 self.enter_scope();
 
+                if !expr.name.is_empty() {
+                    self.symbol_table.define_function(&expr.name);
+                }
+
                 for par in expr.parameters.iter() {
                     self.symbol_table.define(&par.name);
                 }
@@ -372,15 +377,13 @@ impl Compiler {
     }
 
     fn load_symbol(&mut self, symbol: &Symbol) {
-        self.emit(
-            match symbol.scope {
-                SymbolScope::Global => Opcode::OpGetGlobal,
-                SymbolScope::Local => Opcode::OpGetLocal,
-                SymbolScope::Builtin => Opcode::OpGetBuiltin,
-                SymbolScope::Free => Opcode::OpGetFree,
-            },
-            &[symbol.index as i32],
-        );
+        match symbol.scope {
+            SymbolScope::Global => self.emit(Opcode::OpGetGlobal, &[symbol.index as i32]),
+            SymbolScope::Local => self.emit(Opcode::OpGetLocal, &[symbol.index as i32]),
+            SymbolScope::Builtin => self.emit(Opcode::OpGetBuiltin, &[symbol.index as i32]),
+            SymbolScope::Free => self.emit(Opcode::OpGetFree, &[symbol.index as i32]),
+            SymbolScope::Function => self.emit(Opcode::OpCurrentClosure, &[]),
+        };
     }
 }
 

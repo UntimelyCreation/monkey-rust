@@ -34,6 +34,7 @@ mod tests {
             make(Opcode::OpGetBuiltin, &[128]),
             make(Opcode::OpClosure, &[65534, 255]),
             make(Opcode::OpGetFree, &[19]),
+            make(Opcode::OpCurrentClosure, &[]),
         ];
         let expected_instrs = [
             (Opcode::OpConstant, vec![255, 254]),
@@ -65,6 +66,7 @@ mod tests {
             (Opcode::OpGetBuiltin, vec![128]),
             (Opcode::OpClosure, vec![255, 254, 255]),
             (Opcode::OpGetFree, vec![19]),
+            (Opcode::OpCurrentClosure, vec![]),
         ];
 
         for (i, instr) in instructions.into_iter().enumerate() {

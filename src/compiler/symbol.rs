@@ -6,6 +6,7 @@ pub enum SymbolScope {
     Local,
     Builtin,
     Free,
+    Function,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -85,6 +86,16 @@ impl SymbolTable {
         });
         self.store.insert(original.name.to_string(), symbol.clone());
 
+        symbol
+    }
+
+    pub fn define_function(&mut self, name: &str) -> Rc<Symbol> {
+        let symbol = Rc::new(Symbol {
+            name: name.to_string(),
+            scope: SymbolScope::Function,
+            index: 0,
+        });
+        self.store.insert(name.to_string(), symbol.clone());
         symbol
     }
 
