@@ -107,14 +107,14 @@ impl Vm {
             self.current_frame_mut().ip += 1;
 
             let ip = self.current_frame().ip as usize;
-            let instr = self.current_frame().instructions().stream[ip].clone();
-            let op = &instr.0;
-            let operands = &instr.1;
+            let instr = &self.current_frame().instructions().stream;
+            let op = Opcode::from(instr[ip]);
 
             match op {
-                Opcode::OpConstant => match operands[..].try_into() {
+                Opcode::OpConstant => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let const_index = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
                         self.push_stack(self.constants[const_index].clone())?;
                     }
                     Err(..) => {
@@ -128,7 +128,7 @@ impl Vm {
                     self.pop_stack();
                 }
                 Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
-                    self.exec_binary_operation(op)?;
+                    self.exec_binary_operation(&op)?;
                 }
                 Opcode::OpTrue => {
                     self.push_stack(Object::Boolean(true))?;
@@ -137,7 +137,7 @@ impl Vm {
                     self.push_stack(Object::Boolean(false))?;
                 }
                 Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
-                    self.exec_comparison(op)?;
+                    self.exec_comparison(&op)?;
                 }
                 Opcode::OpMinus => {
                     self.exec_minus_operator()?;
@@ -145,7 +145,7 @@ impl Vm {
                 Opcode::OpBang => {
                     self.exec_bang_operator()?;
                 }
-                Opcode::OpJump => match operands[..].try_into() {
+                Opcode::OpJump => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let jump_pos = u16::from_be_bytes(bytes) as usize;
                         self.current_frame_mut().ip = (jump_pos - 1) as i32;
@@ -154,9 +154,10 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpJumpCond => match operands[..].try_into() {
+                Opcode::OpJumpCond => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let jump_pos = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         let condition = self.pop_stack();
                         if !condition.is_truthy() {
@@ -167,9 +168,10 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpGetGlobal => match operands[..].try_into() {
+                Opcode::OpGetGlobal => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let global_index = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         self.push_stack(self.globals[global_index].clone())?;
                     }
@@ -177,9 +179,10 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpSetGlobal => match operands[..].try_into() {
+                Opcode::OpSetGlobal => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let global_index = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         self.globals[global_index] = self.pop_stack();
                     }
@@ -187,9 +190,10 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpArray => match operands[..].try_into() {
+                Opcode::OpArray => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let num_elements = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         let new_sp = self.sp - num_elements;
                         let array = self.build_array(new_sp, self.sp);
@@ -200,9 +204,10 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpHash => match operands[..].try_into() {
+                Opcode::OpHash => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let num_elements = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         let new_sp = self.sp - num_elements;
                         let hash = self.build_hash(new_sp, self.sp)?;
@@ -219,16 +224,12 @@ impl Vm {
 
                     self.execute_index_expression(&identifier, &index)?;
                 }
-                Opcode::OpCall => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let num_args = u8::from_be_bytes(bytes) as usize;
+                Opcode::OpCall => {
+                    let num_args = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
 
-                        self.execute_call(num_args)?;
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
+                    self.execute_call(num_args)?;
+                }
                 Opcode::OpReturnValue => {
                     let return_value = self.pop_stack();
 
@@ -243,68 +244,47 @@ impl Vm {
 
                     self.push_stack(Object::Null)?;
                 }
-                Opcode::OpGetLocal => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let local_index = u8::from_be_bytes(bytes) as usize;
+                Opcode::OpGetLocal => {
+                    let local_index = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
 
-                        let base_pointer = self.current_frame().base_pointer;
-                        self.push_stack(self.stack[base_pointer + local_index].clone())?;
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
-                Opcode::OpSetLocal => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let local_index = u8::from_be_bytes(bytes) as usize;
+                    let base_pointer = self.current_frame().base_pointer;
+                    self.push_stack(self.stack[base_pointer + local_index].clone())?;
+                }
+                Opcode::OpSetLocal => {
+                    let local_index = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
 
-                        let base_pointer = self.current_frame().base_pointer;
-                        self.stack[base_pointer + local_index] = self.pop_stack();
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
-                Opcode::OpGetBuiltin => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let builtin_index = u8::from_be_bytes(bytes) as usize;
+                    let base_pointer = self.current_frame().base_pointer;
+                    self.stack[base_pointer + local_index] = self.pop_stack();
+                }
+                Opcode::OpGetBuiltin => {
+                    let builtin_index = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
 
-                        let definition = BUILTINS[builtin_index].1;
+                    let definition = BUILTINS[builtin_index].1;
 
-                        self.push_stack(Object::BuiltinFn(definition))?;
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
-                Opcode::OpClosure => match operands[..2].try_into() {
+                    self.push_stack(Object::BuiltinFn(definition))?;
+                }
+                Opcode::OpClosure => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let const_index = u16::from_be_bytes(bytes) as usize;
-                        match operands[2..].try_into() {
-                            Ok(bytes) => {
-                                let num_free = u8::from_be_bytes(bytes) as usize;
-                                self.push_closure(const_index, num_free)?;
-                            }
-                            Err(..) => {
-                                return Err("error in instruction".to_string());
-                            }
-                        }
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
-                Opcode::OpGetFree => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let free_index = u8::from_be_bytes(bytes) as usize;
+                        let num_free = instr[ip + 3] as usize;
+                        self.current_frame_mut().ip += 3;
 
-                        let current_closure = &self.current_frame().closure;
-                        self.push_stack(current_closure.free_vars[free_index].clone())?;
+                        self.push_closure(const_index, num_free)?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
                     }
                 },
+                Opcode::OpGetFree => {
+                    let free_index = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
+
+                    let current_closure = &self.current_frame().closure;
+                    self.push_stack(current_closure.free_vars[free_index].clone())?;
+                }
                 Opcode::OpCurrentClosure => {
                     let current_closure = self.current_frame().closure.clone();
                     self.push_stack(Object::Closure(current_closure))?;

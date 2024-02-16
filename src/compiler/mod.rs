@@ -15,8 +15,8 @@ type CompileError = String;
 
 pub struct CompilationScope {
     instructions: Instructions,
-    last_op: Opcode,
-    prev_op: Opcode,
+    last_instruction: EmittedInstruction,
+    prev_instruction: EmittedInstruction,
 }
 
 impl Default for CompilationScope {
@@ -29,8 +29,23 @@ impl CompilationScope {
     pub fn new() -> Self {
         Self {
             instructions: Instructions::new(),
-            last_op: Opcode::OpNull,
-            prev_op: Opcode::OpNull,
+            last_instruction: EmittedInstruction::new(),
+            prev_instruction: EmittedInstruction::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EmittedInstruction {
+    pub opcode: Opcode,
+    pub position: usize,
+}
+
+impl EmittedInstruction {
+    pub fn new() -> Self {
+        Self {
+            opcode: Opcode::OpNull,
+            position: 0,
         }
     }
 }
@@ -71,10 +86,15 @@ impl Compiler {
         match node {
             Node::Program(prgm) => {
                 for stmt in prgm.0.iter() {
-                    self.compile_stmt(stmt)?;
+                    self.compile_statement(stmt)?;
                 }
             }
-            _ => todo!(),
+            Node::Statement(stmt) => {
+                self.compile_statement(stmt)?;
+            }
+            Node::Expression(expr) => {
+                self.compile_expression(expr)?;
+            }
         }
 
         Ok(self.bytecode())
@@ -82,12 +102,12 @@ impl Compiler {
 
     fn compile_block_statement(&mut self, stmts: &BlockStatement) -> Result<(), CompileError> {
         for stmt in stmts.statements.iter() {
-            self.compile_stmt(stmt)?;
+            self.compile_statement(stmt)?;
         }
         Ok(())
     }
 
-    fn compile_stmt(&mut self, stmt: &Statement) -> Result<(), CompileError> {
+    fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompileError> {
         match stmt {
             Statement::Let(stmt) => {
                 let symbol = self.symbol_table.define(&stmt.identifier.name);
@@ -298,10 +318,10 @@ impl Compiler {
     }
 
     fn emit(&mut self, op: Opcode, operands: &[i32]) -> usize {
-        let instruction = make(op.clone(), operands);
-        let position = self.add_instruction(instruction);
+        let mut instruction = make(op.clone(), operands);
+        let position = self.add_instruction(&mut instruction);
 
-        self.set_last_op(op);
+        self.set_last_instruction(op, position);
 
         position
     }
@@ -319,34 +339,47 @@ impl Compiler {
             return false;
         }
 
-        self.scopes[self.scope_index].last_op == op
+        self.scopes[self.scope_index].last_instruction.opcode == op
     }
 
-    fn add_instruction(&mut self, instruction: (Opcode, Vec<u8>)) -> usize {
+    fn add_instruction(&mut self, instr: &mut Vec<u8>) -> usize {
         let pos_new_instr = self.current_instructions().stream.len();
-        self.current_instructions_mut().stream.push(instruction);
+        self.current_instructions_mut().stream.append(instr);
         pos_new_instr
     }
 
-    fn set_last_op(&mut self, op: Opcode) {
-        let prev = self.scopes[self.scope_index].last_op.clone();
+    fn replace_instruction(&mut self, position: usize, new_instr: Vec<u8>) {
+        self.current_instructions_mut().stream[position..(position + new_instr.len())]
+            .copy_from_slice(&new_instr[..]);
+    }
 
-        self.scopes[self.scope_index].prev_op = prev;
-        self.scopes[self.scope_index].last_op = op;
+    fn set_last_instruction(&mut self, op: Opcode, position: usize) {
+        let previous = self.scopes[self.scope_index].last_instruction.clone();
+        let last_instruction = EmittedInstruction {
+            opcode: op,
+            position,
+        };
+
+        self.scopes[self.scope_index].prev_instruction = previous;
+        self.scopes[self.scope_index].last_instruction = last_instruction;
     }
 
     fn remove_last_instr(&mut self) {
-        let prev = self.scopes[self.scope_index].prev_op.clone();
+        let previous = self.scopes[self.scope_index].prev_instruction.clone();
+        let last = self.scopes[self.scope_index].last_instruction.clone();
 
-        self.current_instructions_mut().stream.pop();
-        self.scopes[self.scope_index].last_op = prev;
+        let old = self.current_instructions().stream.clone();
+        let new = old[..last.position].to_vec();
+
+        self.scopes[self.scope_index].instructions.stream = new;
+        self.scopes[self.scope_index].last_instruction = previous;
     }
 
     fn update_operand(&mut self, position: usize, operand: i32) {
-        let op = self.current_instructions().stream[position].0.clone();
+        let op = Opcode::from(self.current_instructions().stream[position]);
         let new_instr = make(op, &[operand]);
 
-        self.current_instructions_mut().stream[position] = new_instr;
+        self.replace_instruction(position, new_instr);
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {
