@@ -144,7 +144,11 @@ impl Parser {
 
                 self.next_token();
 
-                let value = self.parse_expression(LOWEST)?;
+                let mut value = self.parse_expression(LOWEST)?;
+
+                if let Expression::FnLiteral(ref mut expr) = value {
+                    expr.name = name.clone();
+                }
 
                 if self.peek_token == Token::Semicolon {
                     self.next_token();
@@ -246,7 +250,7 @@ impl Parser {
         let operand = self.parse_expression(PREFIX)?;
 
         Ok(Expression::Prefix(PrefixExpression {
-            prefix,
+            operator: prefix,
             operand: Box::new(operand),
         }))
     }
@@ -321,6 +325,7 @@ impl Parser {
         let body = self.parse_block_statement();
 
         Ok(Expression::FnLiteral(FnLiteralExpression {
+            name: "".to_string(),
             parameters,
             body,
         }))

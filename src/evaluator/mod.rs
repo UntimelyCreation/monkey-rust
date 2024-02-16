@@ -2,15 +2,15 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use crate::object::builtins::get_builtin_fn;
+use crate::object::{get_bool_object, is_truthy, HashKey, HashPair, Object};
 use crate::parser::ast::{
     BlockStatement, Expression, HashLiteralExpression, IdentifierExpression, IfExpression, Node,
     Statement,
 };
 use environment::Environment;
-use object::{HashKey, HashPair, Object};
 
 pub mod environment;
-pub mod object;
 mod test_evaluator;
 
 type EvalError = String;
@@ -84,7 +84,7 @@ fn eval_expression(expr: &Expression, env: Rc<RefCell<Environment>>) -> Result<O
         Expression::String(expr) => Ok(Object::String(expr.value.to_owned())),
         Expression::Prefix(expr) => {
             let rhs = eval_expression(&expr.operand, env)?;
-            eval_prefix_expression(expr.prefix.get_literal(), &rhs)
+            eval_prefix_expression(expr.operator.get_literal(), &rhs)
         }
         Expression::Infix(expr) => {
             let lhs = eval_expression(&expr.lhs, env.clone())?;
@@ -242,7 +242,7 @@ fn eval_identifier(
     match env.borrow().get(value) {
         Some(val) => Ok(val),
         None => match get_builtin_fn(value) {
-            Some(builtin) => Ok(builtin),
+            Some(builtin) => Ok(Object::BuiltinFn(builtin)),
             None => Err(format!("identifier not found: {}", value)),
         },
     }
@@ -266,7 +266,7 @@ fn apply_function(function: &Object, args: &Vec<Object>) -> Result<Object, EvalE
             }
             Ok(evaluated)
         }
-        Object::Builtin(builtin) => Ok(builtin(args.to_owned())),
+        Object::BuiltinFn(builtin) => Ok(builtin(args.to_owned())),
         _ => Err(format!("not a function: {}", function.get_type_str(),)),
     }
 }
@@ -298,7 +298,7 @@ fn eval_index_expression(identifier: &Object, index: &Object) -> Result<Object, 
 }
 
 fn eval_array_index_expression(array: &[Object], index: usize) -> Result<Object, EvalError> {
-    if index > array.len() - 1 {
+    if index >= array.len() {
         return Ok(Object::Null);
     }
 
@@ -340,130 +340,4 @@ fn eval_hash_literal(
     }
 
     Ok(Object::Hash(pairs))
-}
-
-fn new_error(message: String) -> Object {
-    Object::Error(message)
-}
-
-fn is_truthy(object: &Object) -> bool {
-    !matches!(object, Object::Boolean(false) | Object::Null)
-}
-
-fn get_bool_object(expr: bool) -> Object {
-    if expr {
-        Object::Boolean(true)
-    } else {
-        Object::Boolean(false)
-    }
-}
-
-fn get_builtin_fn(name: &str) -> Option<Object> {
-    match name {
-        "len" => Some(Object::Builtin(|objs| {
-            if objs.len() != 1 {
-                return new_error(format!(
-                    "wrong number of arguments: expected 1, found {}",
-                    objs.len()
-                ));
-            }
-
-            match &objs[0] {
-                Object::String(string) => Object::Integer(string.len() as i32),
-                Object::Array(array) => Object::Integer(array.len() as i32),
-                _ => new_error(format!(
-                    "argument to 'len' not supported, found {}",
-                    objs[0].get_type_str()
-                )),
-            }
-        })),
-        "first" => Some(Object::Builtin(|objs| {
-            if objs.len() != 1 {
-                return new_error(format!(
-                    "wrong number of arguments: expected 1, found {}",
-                    objs.len()
-                ));
-            }
-
-            match &objs[0] {
-                Object::Array(elements) => {
-                    if !elements.is_empty() {
-                        elements[0].to_owned()
-                    } else {
-                        Object::Null
-                    }
-                }
-                _ => new_error(format!(
-                    "argument to 'first' must be ARRAY, found {}",
-                    objs[0].get_type_str()
-                )),
-            }
-        })),
-        "last" => Some(Object::Builtin(|objs| {
-            if objs.len() != 1 {
-                return new_error(format!(
-                    "wrong number of arguments: expected 1, found {}",
-                    objs.len()
-                ));
-            }
-
-            match &objs[0] {
-                Object::Array(elements) => elements.last().unwrap_or(&Object::Null).clone(),
-                _ => new_error(format!(
-                    "argument to 'last' must be ARRAY, found {}",
-                    objs[0].get_type_str()
-                )),
-            }
-        })),
-        "rest" => Some(Object::Builtin(|objs| {
-            if objs.len() != 1 {
-                return new_error(format!(
-                    "wrong number of arguments: expected 1, found {}",
-                    objs.len()
-                ));
-            }
-
-            match &objs[0] {
-                Object::Array(elements) => {
-                    if !elements.is_empty() {
-                        Object::Array(elements[1..].to_owned())
-                    } else {
-                        Object::Null
-                    }
-                }
-                _ => new_error(format!(
-                    "argument to 'rest' must be ARRAY, found {}",
-                    objs[0].get_type_str()
-                )),
-            }
-        })),
-        "push" => Some(Object::Builtin(|objs| {
-            if objs.len() != 2 {
-                return new_error(format!(
-                    "wrong number of arguments: expected 2, found {}",
-                    objs.len()
-                ));
-            }
-
-            match &objs[0] {
-                Object::Array(elements) => {
-                    let mut elements = elements.clone();
-                    elements.push(objs[1].clone());
-                    Object::Array(elements)
-                }
-                _ => new_error(format!(
-                    "argument to 'push' must be ARRAY, found {}",
-                    objs[0].get_type_str()
-                )),
-            }
-        })),
-        "puts" => Some(Object::Builtin(|objs| {
-            for obj in objs.iter() {
-                println!("{}", obj);
-            }
-
-            Object::Null
-        })),
-        _ => None,
-    }
 }

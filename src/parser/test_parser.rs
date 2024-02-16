@@ -128,7 +128,7 @@ return x;";
 
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Prefix(PrefixExpression {
-                prefix: Token::Bang,
+                operator: Token::Bang,
                 operand: Box::new(Expression::Boolean(BooleanExpression { value: true })),
             }),
         })];
@@ -141,7 +141,7 @@ return x;";
 
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::Prefix(PrefixExpression {
-                prefix: Token::Minus,
+                operator: Token::Minus,
                 operand: Box::new(Expression::Integer(IntegerExpression { value: 12 })),
             }),
         })];
@@ -293,6 +293,7 @@ return x;";
 
         let expected = vec![Statement::Expression(ExpressionStatement {
             expr: Expression::FnLiteral(FnLiteralExpression {
+                name: "".to_string(),
                 parameters: vec![
                     IdentifierExpression {
                         name: "x".to_string(),
@@ -340,6 +341,7 @@ return x;";
         for (i, input) in inputs.iter().enumerate() {
             let expected = vec![Statement::Expression(ExpressionStatement {
                 expr: Expression::FnLiteral(FnLiteralExpression {
+                    name: "".to_string(),
                     parameters: expected_parameters[i].clone(),
                     body: BlockStatement { statements: vec![] },
                 }),

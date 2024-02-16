@@ -100,7 +100,7 @@ impl Display for Expression {
             Expression::Integer(expr) => write!(f, "{}", expr.value),
             Expression::String(expr) => write!(f, "{}", expr.value),
             Expression::Prefix(expr) => {
-                write!(f, "({}{})", expr.prefix.get_literal(), expr.operand)
+                write!(f, "({}{})", expr.operator.get_literal(), expr.operand)
             }
             Expression::Infix(expr) => write!(
                 f,
@@ -120,7 +120,12 @@ impl Display for Expression {
             },
             Expression::FnLiteral(expr) => write!(
                 f,
-                "fn({}) {{ {} }}",
+                "{} fn({}) {{ {} }}",
+                if expr.name.is_empty() {
+                    "".to_string()
+                } else {
+                    format!("<{}>", expr.name)
+                },
                 fmt_identifier_expressions(&expr.parameters, ", "),
                 expr.body
             ),
@@ -170,7 +175,7 @@ pub struct StringExpression {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct PrefixExpression {
-    pub prefix: Token,
+    pub operator: Token,
     pub operand: Box<Expression>,
 }
 
@@ -195,6 +200,7 @@ pub struct IfExpression {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub struct FnLiteralExpression {
+    pub name: String,
     pub parameters: Vec<IdentifierExpression>,
     pub body: BlockStatement,
 }

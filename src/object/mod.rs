@@ -6,8 +6,12 @@ use std::{
     rc::Rc,
 };
 
-use crate::evaluator::environment::Environment;
 use crate::parser::ast::{fmt_identifier_expressions, BlockStatement, IdentifierExpression};
+use crate::{code::Instructions, evaluator::environment::Environment};
+
+use self::builtins::BuiltinFn;
+
+pub mod builtins;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {
@@ -20,14 +24,14 @@ pub enum Object {
         body: BlockStatement,
         env: Rc<RefCell<Environment>>,
     },
-    Builtin(BuiltinFn),
+    CompiledFn(CompiledFn),
+    Closure(Closure),
+    BuiltinFn(BuiltinFn),
     Array(Vec<Object>),
     Hash(BTreeMap<HashKey, HashPair>),
     Error(String),
     Null,
 }
-
-type BuiltinFn = fn(Vec<Object>) -> Object;
 
 impl Object {
     pub fn get_type_str(&self) -> String {
@@ -37,7 +41,9 @@ impl Object {
             Object::String(_) => "STRING".to_string(),
             Object::ReturnValue(_) => "RETURN".to_string(),
             Object::Function { .. } => "FUNCTION".to_string(),
-            Object::Builtin(_) => "BUILTIN".to_string(),
+            Object::CompiledFn { .. } => "COMPILED_FUNCTION".to_string(),
+            Object::Closure(..) => "CLOSURE".to_string(),
+            Object::BuiltinFn(_) => "BUILTIN".to_string(),
             Object::Array(_) => "ARRAY".to_string(),
             Object::Hash(_) => "HASH".to_string(),
             Object::Error(_) => "ERROR".to_string(),
@@ -69,6 +75,14 @@ impl Object {
             _ => None,
         }
     }
+
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Object::Boolean(value) => *value,
+            Object::Null => false,
+            _ => true,
+        }
+    }
 }
 
 impl Display for Object {
@@ -88,7 +102,13 @@ impl Display for Object {
                     body
                 )
             }
-            Self::Builtin(_) => write!(f, "builtin function"),
+            Self::CompiledFn(_) => {
+                write!(f, "compiled function")
+            }
+            Self::Closure(_) => {
+                write!(f, "closure")
+            }
+            Self::BuiltinFn(_) => write!(f, "builtin function"),
             Self::Array(elements) => write!(
                 f,
                 "[{}]",
@@ -113,6 +133,50 @@ impl Display for Object {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct CompiledFn {
+    pub instructions: Instructions,
+    pub num_locals: usize,
+    pub num_parameters: usize,
+}
+
+impl Default for CompiledFn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CompiledFn {
+    pub fn new() -> Self {
+        Self {
+            instructions: Instructions::new(),
+            num_locals: 0,
+            num_parameters: 0,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Closure {
+    pub function: Rc<CompiledFn>,
+    pub free_vars: Vec<Object>,
+}
+
+impl Default for Closure {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Closure {
+    pub fn new() -> Self {
+        Self {
+            function: Rc::new(CompiledFn::new()),
+            free_vars: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct HashKey {
     kind: String,
@@ -123,4 +187,20 @@ pub struct HashKey {
 pub struct HashPair {
     pub key: Object,
     pub value: Object,
+}
+
+pub fn new_error(message: String) -> Object {
+    Object::Error(message)
+}
+
+pub fn is_truthy(object: &Object) -> bool {
+    !matches!(object, Object::Boolean(false) | Object::Null)
+}
+
+pub fn get_bool_object(expr: bool) -> Object {
+    if expr {
+        Object::Boolean(true)
+    } else {
+        Object::Boolean(false)
+    }
 }

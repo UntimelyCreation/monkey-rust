@@ -1,37 +1,42 @@
 use std::{
-    cell::RefCell,
+    error::Error,
     io::{self, Write},
-    rc::Rc,
 };
 
 use monkey_rust::{
-    evaluator::environment::Environment,
-    evaluator::eval,
+    compiler::Compiler,
     parser::{eprint_parse_errors, parse},
+    vm::Vm,
 };
 
 const PROMPT: &str = ">> ";
 
-pub fn main() {
-    let env = Rc::new(RefCell::new(Environment::new()));
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut compiler = Compiler::new();
+    let mut vm = Vm::new();
 
     println!("Welcome to the Monkey programming language!");
     loop {
         let mut input = String::new();
 
         print!("{}", PROMPT);
-        match io::stdout().flush() {
-            Ok(_) => match io::stdin().read_line(&mut input) {
-                Ok(_) => match parse(&input) {
-                    Ok(program) => {
-                        let evaluated = eval(program, env.clone());
-                        println!("{}", evaluated);
+        io::stdout().flush()?;
+        io::stdin().read_line(&mut input)?;
+
+        match parse(&input) {
+            Ok(program) => match compiler.compile(&program) {
+                Ok(bytecode) => {
+                    vm.update(bytecode);
+                    match vm.run() {
+                        Ok(_) => {
+                            println!("{}", vm.last_popped());
+                        }
+                        Err(error) => eprintln!("vm error: {error}"),
                     }
-                    Err(errs) => eprint_parse_errors(&errs),
-                },
-                Err(error) => eprintln!("ERROR: {error}"),
+                }
+                Err(error) => eprintln!("compile error: {error}"),
             },
-            Err(error) => eprintln!("ERROR: {error}"),
+            Err(errs) => eprint_parse_errors(&errs),
         };
     }
 }

@@ -5,7 +5,7 @@ mod tests {
     use crate::{
         evaluator::environment::Environment,
         evaluator::eval,
-        evaluator::object::{HashPair, Object},
+        object::{HashPair, Object},
         parser::parse,
     };
 
