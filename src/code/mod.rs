@@ -34,17 +34,6 @@ pub enum Opcode {
     OpCurrentClosure,
 }
 
-impl TryFrom<u8> for Opcode {
-    type Error = &'static str;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Opcode::OpConstant),
-            _ => Err("no opcode found"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Instructions {
     pub stream: Vec<(Opcode, Vec<u8>)>,
