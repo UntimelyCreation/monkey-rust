@@ -23,8 +23,17 @@ mod tests {
             .compile(&program)
             .expect("error occurred while compiling program");
 
-        assert_eq!(concat_instructions(expected_instrs), bytecode.instructions);
-        assert_eq!(expected_constants, bytecode.constants);
+        assert_eq!(
+            concat_instructions(expected_instrs),
+            bytecode.instructions.clone()
+        );
+        assert_eq!(
+            expected_constants
+                .iter()
+                .map(|obj| Rc::new(obj.clone()))
+                .collect::<Vec<_>>(),
+            bytecode.constants
+        );
     }
 
     #[test]

@@ -21,19 +21,13 @@ pub const GLOBALS_SIZE: usize = 65535;
 const MAX_FRAMES: usize = 1024;
 
 pub struct Vm {
-    constants: Vec<Object>,
-    stack: Vec<Object>,
+    constants: Vec<Rc<Object>>,
+    stack: Vec<Rc<Object>>,
     sp: usize,
-    globals: Vec<Object>,
+    globals: Vec<Rc<Object>>,
 
     frames: Vec<Frame>,
     frames_idx: usize,
-}
-
-impl Default for Vm {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl Vm {
@@ -41,10 +35,16 @@ impl Vm {
         Self {
             constants: Vec::new(),
 
-            stack: vec![Object::Null; STACK_SIZE],
+            stack: {
+                let rc = Rc::new(Object::Null);
+                vec![rc; STACK_SIZE]
+            },
             sp: 0,
 
-            globals: vec![Object::Null; GLOBALS_SIZE],
+            globals: {
+                let rc = Rc::new(Object::Null);
+                vec![rc; GLOBALS_SIZE]
+            },
 
             frames: Vec::new(),
             frames_idx: 1,
@@ -53,7 +53,7 @@ impl Vm {
 
     pub fn from_bytecode(bytecode: Bytecode) -> Self {
         let main_function = CompiledFn {
-            instructions: bytecode.instructions,
+            instructions: bytecode.instructions.clone(),
             num_locals: 0,
             num_parameters: 0,
         };
@@ -67,12 +67,18 @@ impl Vm {
         frames[0] = main_frame;
 
         Self {
-            constants: bytecode.constants,
+            constants: bytecode.constants.to_vec(),
 
-            stack: vec![Object::Null; STACK_SIZE],
+            stack: {
+                let rc = Rc::new(Object::Null);
+                vec![rc; STACK_SIZE]
+            },
             sp: 0,
 
-            globals: vec![Object::Null; GLOBALS_SIZE],
+            globals: {
+                let rc = Rc::new(Object::Null);
+                vec![rc; GLOBALS_SIZE]
+            },
 
             frames,
             frames_idx: 1,
@@ -80,10 +86,10 @@ impl Vm {
     }
 
     pub fn update(&mut self, bytecode: Bytecode) {
-        self.constants = bytecode.constants;
+        self.constants = bytecode.constants.to_vec();
 
         let main_function = CompiledFn {
-            instructions: bytecode.instructions,
+            instructions: bytecode.instructions.clone(),
             num_locals: 0,
             num_parameters: 0,
         };
@@ -122,7 +128,7 @@ impl Vm {
                     }
                 },
                 Opcode::OpNull => {
-                    self.push_stack(Object::Null)?;
+                    self.push_stack(Rc::new(Object::Null))?;
                 }
                 Opcode::OpPop => {
                     self.pop_stack();
@@ -131,10 +137,10 @@ impl Vm {
                     self.exec_binary_operation(&op)?;
                 }
                 Opcode::OpTrue => {
-                    self.push_stack(Object::Boolean(true))?;
+                    self.push_stack(Rc::new(Object::Boolean(true)))?;
                 }
                 Opcode::OpFalse => {
-                    self.push_stack(Object::Boolean(false))?;
+                    self.push_stack(Rc::new(Object::Boolean(false)))?;
                 }
                 Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
                     self.exec_comparison(&op)?;
@@ -198,7 +204,7 @@ impl Vm {
                         let new_sp = self.sp - num_elements;
                         let array = self.build_array(new_sp, self.sp);
                         self.sp = new_sp;
-                        self.push_stack(array)?;
+                        self.push_stack(Rc::new(array))?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
@@ -212,7 +218,7 @@ impl Vm {
                         let new_sp = self.sp - num_elements;
                         let hash = self.build_hash(new_sp, self.sp)?;
                         self.sp = new_sp;
-                        self.push_stack(hash)?;
+                        self.push_stack(Rc::new(hash))?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
@@ -242,7 +248,7 @@ impl Vm {
                     let frame = self.pop_frame();
                     self.sp = frame.base_pointer - 1;
 
-                    self.push_stack(Object::Null)?;
+                    self.push_stack(Rc::new(Object::Null))?;
                 }
                 Opcode::OpGetLocal => {
                     let local_index = instr[ip + 1] as usize;
@@ -264,7 +270,7 @@ impl Vm {
 
                     let definition = BUILTINS[builtin_index].1;
 
-                    self.push_stack(Object::BuiltinFn(definition))?;
+                    self.push_stack(Rc::new(Object::BuiltinFn(definition)))?;
                 }
                 Opcode::OpClosure => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
@@ -287,7 +293,7 @@ impl Vm {
                 }
                 Opcode::OpCurrentClosure => {
                     let current_closure = self.current_frame().closure.clone();
-                    self.push_stack(Object::Closure(current_closure))?;
+                    self.push_stack(Rc::new(Object::Closure(current_closure)))?;
                 }
             }
         }
@@ -297,7 +303,7 @@ impl Vm {
     fn exec_binary_operation(&mut self, op: &Opcode) -> Result<(), VmError> {
         let rhs = self.pop_stack();
         let lhs = self.pop_stack();
-        match (&lhs, &rhs) {
+        match (lhs.as_ref(), rhs.as_ref()) {
             (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
                 self.exec_integer_binary_operation(op, *lhs_value, *rhs_value)
             }
@@ -327,7 +333,7 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push_stack(Object::Integer(r)),
+            Some(r) => self.push_stack(Rc::new(Object::Integer(r))),
             None => Err(format!("unknown INTEGER operator: {:?}", op)),
         }
     }
@@ -344,7 +350,7 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push_stack(Object::String(r)),
+            Some(r) => self.push_stack(Rc::new(Object::String(r))),
             None => Err(format!("unknown STRING operator: {:?}", op)),
         }
     }
@@ -352,7 +358,7 @@ impl Vm {
     fn exec_comparison(&mut self, op: &Opcode) -> Result<(), VmError> {
         let rhs = self.pop_stack();
         let lhs = self.pop_stack();
-        match (&lhs, &rhs) {
+        match (lhs.as_ref(), rhs.as_ref()) {
             (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
                 self.exec_integer_comparison(op, *lhs_value, *rhs_value)
             }
@@ -376,7 +382,7 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push_stack(Object::Boolean(r)),
+            Some(r) => self.push_stack(Rc::new(Object::Boolean(r))),
             None => Err(format!("unknown INTEGER operator: {:?}", op)),
         }
     }
@@ -394,15 +400,15 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push_stack(Object::Boolean(r)),
+            Some(r) => self.push_stack(Rc::new(Object::Boolean(r))),
             None => Err(format!("unknown BOOLEAN operator: {:?}", op)),
         }
     }
 
     fn exec_minus_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop_stack();
-        match operand {
-            Object::Integer(value) => self.push_stack(Object::Integer(-value)),
+        match operand.as_ref() {
+            Object::Integer(value) => self.push_stack(Rc::new(Object::Integer(-value))),
             _ => Err(format!(
                 "unsupported type for negation: {}",
                 operand.get_type_str()
@@ -411,15 +417,18 @@ impl Vm {
     }
 
     fn exec_bang_operator(&mut self) -> Result<(), VmError> {
-        match self.pop_stack() {
-            Object::Boolean(value) => self.push_stack(Object::Boolean(!value)),
-            Object::Null => self.push_stack(Object::Boolean(true)),
-            _ => self.push_stack(Object::Boolean(false)),
+        match self.pop_stack().as_ref() {
+            Object::Boolean(value) => self.push_stack(Rc::new(Object::Boolean(!value))),
+            Object::Null => self.push_stack(Rc::new(Object::Boolean(true))),
+            _ => self.push_stack(Rc::new(Object::Boolean(false))),
         }
     }
 
     fn build_array(&self, start: usize, end: usize) -> Object {
-        let mut elements = vec![Object::Null; end - start];
+        let mut elements = {
+            let rc = Rc::new(Object::Null);
+            vec![rc; end - start]
+        };
         elements.clone_from_slice(&self.stack[start..end]);
 
         Object::Array(elements)
@@ -462,11 +471,11 @@ impl Vm {
 
     fn execute_array_index_expression(
         &mut self,
-        array: &[Object],
+        array: &[Rc<Object>],
         index: usize,
     ) -> Result<(), VmError> {
         if index >= array.len() {
-            return self.push_stack(Object::Null);
+            return self.push_stack(Rc::new(Object::Null));
         }
 
         self.push_stack(array[index].clone())
@@ -479,9 +488,9 @@ impl Vm {
     ) -> Result<(), VmError> {
         if let Some(hash_key) = index.get_hash_key() {
             if let Some(pair) = hash.get(&hash_key) {
-                self.push_stack(pair.clone().value)
+                self.push_stack(pair.value.clone())
             } else {
-                self.push_stack(Object::Null)
+                self.push_stack(Rc::new(Object::Null))
             }
         } else {
             Err(format!("unusable as hash key: {}", index.get_type_str()))
@@ -489,7 +498,7 @@ impl Vm {
     }
 
     fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
-        match &self.stack[self.sp - 1 - num_args] {
+        match self.stack[self.sp - 1 - num_args].as_ref() {
             Object::Closure(closure) => self.call_closure(closure.clone(), num_args),
             Object::BuiltinFn(builtin_fn) => self.call_builtin(*builtin_fn, num_args),
             _ => Err("calling non-function".to_string()),
@@ -514,17 +523,17 @@ impl Vm {
     fn call_builtin(&mut self, builtin_fn: BuiltinFn, num_args: usize) -> Result<(), VmError> {
         let args = &self.stack[self.sp - num_args..self.sp];
 
-        let result = builtin_fn(args.to_vec());
+        let result = builtin_fn(args);
         self.sp -= num_args + 1;
 
         self.push_stack(result)
     }
 
-    pub fn last_popped(&self) -> Object {
+    pub fn last_popped(&self) -> Rc<Object> {
         self.stack[self.sp].clone()
     }
 
-    fn push_stack(&mut self, obj: Object) -> Result<(), VmError> {
+    fn push_stack(&mut self, obj: Rc<Object>) -> Result<(), VmError> {
         if self.sp > STACK_SIZE {
             return Err("stack overflow".to_string());
         }
@@ -534,7 +543,7 @@ impl Vm {
         Ok(())
     }
 
-    fn pop_stack(&mut self) -> Object {
+    fn pop_stack(&mut self) -> Rc<Object> {
         let obj = self.stack[self.sp - 1].clone();
         self.sp -= 1;
         obj
@@ -560,9 +569,12 @@ impl Vm {
 
     fn push_closure(&mut self, const_index: usize, num_free: usize) -> Result<(), VmError> {
         let constant = &self.constants[const_index];
-        match constant {
+        match constant.as_ref() {
             Object::CompiledFn(compiled_fn) => {
-                let mut free_vars = vec![Object::Null; num_free];
+                let mut free_vars = {
+                    let rc = Rc::new(Object::Null);
+                    vec![rc; num_free]
+                };
                 free_vars.clone_from_slice(&self.stack[self.sp - num_free..self.sp]);
                 self.sp -= num_free;
 
@@ -570,7 +582,7 @@ impl Vm {
                     function: Rc::new(compiled_fn.clone()),
                     free_vars,
                 });
-                self.push_stack(closure)
+                self.push_stack(Rc::new(closure))
             }
             _ => Err(format!("not a function: {}", constant)),
         }

@@ -7,12 +7,6 @@ pub struct Frame {
     pub base_pointer: usize,
 }
 
-impl Default for Frame {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Frame {
     pub fn new() -> Self {
         Self {

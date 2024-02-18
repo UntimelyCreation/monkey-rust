@@ -15,7 +15,7 @@ mod tests {
         let program = parse(input).expect("error occurred while parsing program");
         let eval_input = eval(program, env);
 
-        assert_eq!(eval_input, expected);
+        assert_eq!(eval_input, Rc::new(expected));
     }
 
     #[test]
@@ -199,17 +199,17 @@ mod tests {
             Object::Integer(4),
             Object::Error("argument to 'last' must be ARRAY, found FUNCTION".to_string()),
             Object::Array(vec![
-                Object::Integer(2),
-                Object::Integer(3),
-                Object::Integer(4),
+                Rc::new(Object::Integer(2)),
+                Rc::new(Object::Integer(3)),
+                Rc::new(Object::Integer(4)),
             ]),
             Object::Error("argument to 'rest' must be ARRAY, found STRING".to_string()),
             Object::Array(vec![
-                Object::Integer(1),
-                Object::Integer(2),
-                Object::Integer(3),
-                Object::Integer(4),
-                Object::Integer(5),
+                Rc::new(Object::Integer(1)),
+                Rc::new(Object::Integer(2)),
+                Rc::new(Object::Integer(3)),
+                Rc::new(Object::Integer(4)),
+                Rc::new(Object::Integer(5)),
             ]),
             Object::Error("argument to 'push' must be ARRAY, found STRING".to_string()),
             Object::Error("wrong number of arguments: expected 2, found 1".to_string()),
@@ -226,9 +226,9 @@ mod tests {
         let input = "[1, 2 * 2, 3 + 3]";
 
         let expected = Object::Array(vec![
-            Object::Integer(1),
-            Object::Integer(4),
-            Object::Integer(6),
+            Rc::new(Object::Integer(1)),
+            Rc::new(Object::Integer(4)),
+            Rc::new(Object::Integer(6)),
         ]);
         test_evaluating(input, expected);
     }
@@ -252,8 +252,8 @@ mod tests {
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key_one,
-                value: Object::Integer(1),
+                key: Rc::new(key_one),
+                value: Rc::new(Object::Integer(1)),
             },
         );
         let key_two = Object::String("two".to_string());
@@ -262,8 +262,8 @@ mod tests {
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key_two,
-                value: Object::Integer(2),
+                key: Rc::new(key_two),
+                value: Rc::new(Object::Integer(2)),
             },
         );
         let key_three = Object::String("three".to_string());
@@ -272,8 +272,8 @@ mod tests {
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key_three,
-                value: Object::Integer(3),
+                key: Rc::new(key_three),
+                value: Rc::new(Object::Integer(3)),
             },
         );
         let key_four = Object::Integer(4);
@@ -282,8 +282,8 @@ mod tests {
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key_four.clone(),
-                value: key_four,
+                key: Rc::new(key_four.clone()),
+                value: Rc::new(key_four),
             },
         );
         let key_five = Object::Boolean(true);
@@ -292,8 +292,8 @@ mod tests {
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key_five,
-                value: Object::Integer(5),
+                key: Rc::new(key_five),
+                value: Rc::new(Object::Integer(5)),
             },
         );
         let key_six = Object::Boolean(false);
@@ -302,8 +302,8 @@ mod tests {
                 .get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key_six,
-                value: Object::Integer(6),
+                key: Rc::new(key_six),
+                value: Rc::new(Object::Integer(6)),
             },
         );
 

@@ -4,14 +4,8 @@ use crate::object::Object;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Environment {
-    map: HashMap<String, Object>,
+    map: HashMap<String, Rc<Object>>,
     outer: Option<Rc<RefCell<Environment>>>,
-}
-
-impl Default for Environment {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl Environment {
@@ -28,7 +22,7 @@ impl Environment {
         env
     }
 
-    pub fn get(&self, identifier: &String) -> Option<Object> {
+    pub fn get(&self, identifier: &String) -> Option<Rc<Object>> {
         match self.map.get(identifier) {
             None => match &self.outer {
                 Some(outer) => outer.borrow().get(identifier),
@@ -38,7 +32,7 @@ impl Environment {
         }
     }
 
-    pub fn set(&mut self, identifier: String, val: Object) {
+    pub fn set(&mut self, identifier: String, val: Rc<Object>) {
         self.map.insert(identifier, val);
     }
 }

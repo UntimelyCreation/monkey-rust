@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     code::{make, Instructions, Opcode},
     lexer::token::Token,
@@ -17,12 +19,6 @@ pub struct CompilationScope {
     instructions: Instructions,
     last_instruction: EmittedInstruction,
     prev_instruction: EmittedInstruction,
-}
-
-impl Default for CompilationScope {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl CompilationScope {
@@ -51,17 +47,11 @@ impl EmittedInstruction {
 }
 
 pub struct Compiler {
-    constants: Vec<Object>,
+    constants: Vec<Rc<Object>>,
     symbol_table: SymbolTable,
 
     scopes: Vec<CompilationScope>,
     scope_index: usize,
-}
-
-impl Default for Compiler {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl Compiler {
@@ -312,8 +302,8 @@ impl Compiler {
 
     fn bytecode(&self) -> Bytecode {
         Bytecode {
-            instructions: self.current_instructions().clone(),
-            constants: self.constants.clone(),
+            instructions: self.current_instructions(),
+            constants: &self.constants,
         }
     }
 
@@ -383,7 +373,7 @@ impl Compiler {
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {
-        self.constants.push(obj);
+        self.constants.push(Rc::new(obj));
         self.constants.len() - 1
     }
 
@@ -420,7 +410,7 @@ impl Compiler {
     }
 }
 
-pub struct Bytecode {
-    pub instructions: Instructions,
-    pub constants: Vec<Object>,
+pub struct Bytecode<'a> {
+    pub instructions: &'a Instructions,
+    pub constants: &'a [Rc<Object>],
 }
