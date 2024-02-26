@@ -18,7 +18,7 @@ pub enum Object {
     Integer(i32),
     Boolean(bool),
     String(String),
-    ReturnValue(Box<Object>),
+    ReturnValue(Rc<Object>),
     Function {
         parameters: Vec<IdentifierExpression>,
         body: BlockStatement,
@@ -27,7 +27,7 @@ pub enum Object {
     CompiledFn(CompiledFn),
     Closure(Closure),
     BuiltinFn(BuiltinFn),
-    Array(Vec<Object>),
+    Array(Vec<Rc<Object>>),
     Hash(BTreeMap<HashKey, HashPair>),
     Error(String),
     Null,
@@ -140,12 +140,6 @@ pub struct CompiledFn {
     pub num_parameters: usize,
 }
 
-impl Default for CompiledFn {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl CompiledFn {
     pub fn new() -> Self {
         Self {
@@ -159,13 +153,7 @@ impl CompiledFn {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Closure {
     pub function: Rc<CompiledFn>,
-    pub free_vars: Vec<Object>,
-}
-
-impl Default for Closure {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub free_vars: Vec<Rc<Object>>,
 }
 
 impl Closure {
@@ -185,8 +173,8 @@ pub struct HashKey {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct HashPair {
-    pub key: Object,
-    pub value: Object,
+    pub key: Rc<Object>,
+    pub value: Rc<Object>,
 }
 
 pub fn new_error(message: String) -> Object {
@@ -197,10 +185,6 @@ pub fn is_truthy(object: &Object) -> bool {
     !matches!(object, Object::Boolean(false) | Object::Null)
 }
 
-pub fn get_bool_object(expr: bool) -> Object {
-    if expr {
-        Object::Boolean(true)
-    } else {
-        Object::Boolean(false)
-    }
+pub fn get_bool_object(expr: bool) -> Rc<Object> {
+    Rc::new(Object::Boolean(expr))
 }

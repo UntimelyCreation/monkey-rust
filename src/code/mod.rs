@@ -1,8 +1,11 @@
+use std::fmt;
+use std::mem::transmute;
+
 mod test_code;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcode {
-    OpConstant,
+    OpConstant = 0,
     OpNull,
     OpPop,
     OpAdd,
@@ -34,20 +37,51 @@ pub enum Opcode {
     OpCurrentClosure,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Instructions {
-    pub stream: Vec<(Opcode, Vec<u8>)>,
+impl From<u8> for Opcode {
+    fn from(value: u8) -> Self {
+        unsafe { transmute(value) }
+    }
 }
 
-impl Default for Instructions {
-    fn default() -> Self {
-        Self::new()
-    }
+#[derive(Clone, PartialEq)]
+pub struct Instructions {
+    pub stream: Vec<u8>,
 }
 
 impl Instructions {
     pub fn new() -> Self {
         Self { stream: Vec::new() }
+    }
+}
+
+impl fmt::Debug for Instructions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let stream = &self.stream;
+        let mut position = 0;
+
+        while position < self.stream.len() {
+            let op = Opcode::from(stream[position]);
+            let definition = lookup(&op);
+            let instruction_len = definition.operand_widths.iter().sum::<usize>() + 1;
+            let (operands, _) = read_operands(
+                &definition,
+                &stream[(position + 1)..(position + instruction_len)],
+            );
+
+            let instr_str = match operands.len() {
+                2 => format!("{} {} {}", definition.name, operands[0], operands[1]),
+                1 => format!("{} {}", definition.name, operands[0]),
+                0 => definition.name.to_string(),
+                _ => panic!(
+                    "unsupported operand width: {}",
+                    definition.operand_widths.len()
+                ),
+            };
+            write!(f, "{:03} {}; ", position, instr_str)?;
+
+            position += instruction_len;
+        }
+        Ok(())
     }
 }
 
@@ -181,48 +215,45 @@ pub fn lookup(op: &Opcode) -> Definition {
     }
 }
 
-pub fn make(op: Opcode, operands: &[i32]) -> (Opcode, Vec<u8>) {
+pub fn make(op: Opcode, operands: &[i32]) -> Vec<u8> {
     let definition = lookup(&op);
 
-    let operands_len = definition.operand_widths.iter().sum();
+    let instruction_len = definition.operand_widths.iter().sum::<usize>() + 1;
 
-    let mut instr_operands = vec![0; operands_len];
+    let mut instruction = vec![0; instruction_len];
+    instruction[0] = op.clone() as u8;
 
-    let mut offset = 0;
+    let mut offset = 1;
     for (i, o) in operands.iter().enumerate() {
         let width = definition.operand_widths[i];
         match width {
-            2 => instr_operands[offset..(offset + 2)].copy_from_slice(&(*o as u16).to_be_bytes()),
-            1 => instr_operands[offset..(offset + 1)].copy_from_slice(&(*o as u8).to_be_bytes()),
+            2 => instruction[offset..(offset + 2)].copy_from_slice(&(*o as u16).to_be_bytes()),
+            1 => instruction[offset..(offset + 1)].copy_from_slice(&(*o as u8).to_be_bytes()),
             _ => panic!("unsupported operand width: {}", width),
         }
         offset += width;
     }
 
-    (op, instr_operands)
+    instruction
 }
 
-pub fn parse(def: &Definition, instruction: (Opcode, Vec<u8>)) -> (Vec<i32>, usize) {
+pub fn read_operands(def: &Definition, instruction: &[u8]) -> (Vec<i32>, usize) {
     let mut operands = vec![0; def.operand_widths.len()];
     let mut offset = 0;
 
     for (i, width) in def.operand_widths.iter().enumerate() {
         match width {
-            2 => match instruction.1[offset..(offset + 2)].try_into() {
+            2 => match instruction[offset..(offset + 2)].try_into() {
                 Ok(bytes) => {
                     operands[i] = u16::from_be_bytes(bytes) as i32;
                 }
                 Err(..) => todo!(),
             },
-            1 => match instruction.1[offset..(offset + 1)].try_into() {
-                Ok(bytes) => {
-                    operands[i] = u8::from_be_bytes(bytes) as i32;
-                }
-                Err(..) => todo!(),
-            },
-            _ => todo!(),
+            1 => operands[i] = instruction[offset] as i32,
+            _ => panic!("unsupported operand width: {}", width),
         }
         offset += width;
     }
+
     (operands, offset)
 }

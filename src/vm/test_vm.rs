@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, rc::Rc};
 
     use crate::{
         compiler::Compiler,
@@ -21,7 +21,7 @@ mod tests {
         vm.run().expect("error occurred while running vm");
 
         let stack_el = vm.last_popped();
-        assert_eq!(expected, stack_el);
+        assert_eq!(expected, stack_el.as_ref().clone());
     }
 
     #[test]
@@ -202,14 +202,14 @@ mod tests {
         let expected_objs = vec![
             Object::Array(vec![]),
             Object::Array(vec![
-                Object::Integer(1),
-                Object::Integer(2),
-                Object::Integer(3),
+                Rc::new(Object::Integer(1)),
+                Rc::new(Object::Integer(2)),
+                Rc::new(Object::Integer(3)),
             ]),
             Object::Array(vec![
-                Object::Integer(3),
-                Object::Integer(12),
-                Object::Integer(11),
+                Rc::new(Object::Integer(3)),
+                Rc::new(Object::Integer(12)),
+                Rc::new(Object::Integer(11)),
             ]),
         ];
 
@@ -228,8 +228,8 @@ mod tests {
             key1.get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key1,
-                value: Object::Integer(2),
+                key: Rc::new(key1),
+                value: Rc::new(Object::Integer(2)),
             },
         );
         let key2 = Object::Integer(3);
@@ -237,8 +237,8 @@ mod tests {
             key2.get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key2,
-                value: Object::Integer(4),
+                key: Rc::new(key2),
+                value: Rc::new(Object::Integer(4)),
             },
         );
         let key3 = Object::Integer(5);
@@ -246,8 +246,8 @@ mod tests {
             key3.get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key3,
-                value: Object::Integer(6),
+                key: Rc::new(key3),
+                value: Rc::new(Object::Integer(6)),
             },
         );
 
@@ -257,8 +257,8 @@ mod tests {
             key1.get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key1,
-                value: Object::Integer(5),
+                key: Rc::new(key1),
+                value: Rc::new(Object::Integer(5)),
             },
         );
         let key2 = Object::Integer(4);
@@ -266,8 +266,8 @@ mod tests {
             key2.get_hash_key()
                 .expect("error occurred while getting hash key"),
             HashPair {
-                key: key2,
-                value: Object::Integer(30),
+                key: Rc::new(key2),
+                value: Rc::new(Object::Integer(30)),
             },
         );
 
@@ -475,9 +475,12 @@ mod tests {
             Object::Integer(3),
             Object::Null,
             Object::Error("argument to 'last' must be ARRAY, found INTEGER".to_string()),
-            Object::Array(vec![Object::Integer(2), Object::Integer(3)]),
+            Object::Array(vec![
+                Rc::new(Object::Integer(2)),
+                Rc::new(Object::Integer(3)),
+            ]),
             Object::Null,
-            Object::Array(vec![Object::Integer(1)]),
+            Object::Array(vec![Rc::new(Object::Integer(1))]),
             Object::Error("argument to 'push' must be ARRAY, found INTEGER".to_string()),
             Object::Null,
         ];

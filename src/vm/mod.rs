@@ -21,19 +21,13 @@ pub const GLOBALS_SIZE: usize = 65535;
 const MAX_FRAMES: usize = 1024;
 
 pub struct Vm {
-    constants: Vec<Object>,
-    stack: Vec<Object>,
+    constants: Vec<Rc<Object>>,
+    stack: Vec<Rc<Object>>,
     sp: usize,
-    globals: Vec<Object>,
+    globals: Vec<Rc<Object>>,
 
     frames: Vec<Frame>,
     frames_idx: usize,
-}
-
-impl Default for Vm {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl Vm {
@@ -41,10 +35,16 @@ impl Vm {
         Self {
             constants: Vec::new(),
 
-            stack: vec![Object::Null; STACK_SIZE],
+            stack: {
+                let rc = Rc::new(Object::Null);
+                vec![rc; STACK_SIZE]
+            },
             sp: 0,
 
-            globals: vec![Object::Null; GLOBALS_SIZE],
+            globals: {
+                let rc = Rc::new(Object::Null);
+                vec![rc; GLOBALS_SIZE]
+            },
 
             frames: Vec::new(),
             frames_idx: 1,
@@ -53,7 +53,7 @@ impl Vm {
 
     pub fn from_bytecode(bytecode: Bytecode) -> Self {
         let main_function = CompiledFn {
-            instructions: bytecode.instructions,
+            instructions: bytecode.instructions.clone(),
             num_locals: 0,
             num_parameters: 0,
         };
@@ -67,12 +67,18 @@ impl Vm {
         frames[0] = main_frame;
 
         Self {
-            constants: bytecode.constants,
+            constants: bytecode.constants.to_vec(),
 
-            stack: vec![Object::Null; STACK_SIZE],
+            stack: {
+                let rc = Rc::new(Object::Null);
+                vec![rc; STACK_SIZE]
+            },
             sp: 0,
 
-            globals: vec![Object::Null; GLOBALS_SIZE],
+            globals: {
+                let rc = Rc::new(Object::Null);
+                vec![rc; GLOBALS_SIZE]
+            },
 
             frames,
             frames_idx: 1,
@@ -80,10 +86,10 @@ impl Vm {
     }
 
     pub fn update(&mut self, bytecode: Bytecode) {
-        self.constants = bytecode.constants;
+        self.constants = bytecode.constants.to_vec();
 
         let main_function = CompiledFn {
-            instructions: bytecode.instructions,
+            instructions: bytecode.instructions.clone(),
             num_locals: 0,
             num_parameters: 0,
         };
@@ -107,14 +113,14 @@ impl Vm {
             self.current_frame_mut().ip += 1;
 
             let ip = self.current_frame().ip as usize;
-            let instr = self.current_frame().instructions().stream[ip].clone();
-            let op = &instr.0;
-            let operands = &instr.1;
+            let instr = &self.current_frame().instructions().stream;
+            let op = Opcode::from(instr[ip]);
 
             match op {
-                Opcode::OpConstant => match operands[..].try_into() {
+                Opcode::OpConstant => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let const_index = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
                         self.push_stack(self.constants[const_index].clone())?;
                     }
                     Err(..) => {
@@ -122,22 +128,22 @@ impl Vm {
                     }
                 },
                 Opcode::OpNull => {
-                    self.push_stack(Object::Null)?;
+                    self.push_stack(Rc::new(Object::Null))?;
                 }
                 Opcode::OpPop => {
                     self.pop_stack();
                 }
                 Opcode::OpAdd | Opcode::OpSub | Opcode::OpMul | Opcode::OpDiv => {
-                    self.exec_binary_operation(op)?;
+                    self.exec_binary_operation(&op)?;
                 }
                 Opcode::OpTrue => {
-                    self.push_stack(Object::Boolean(true))?;
+                    self.push_stack(Rc::new(Object::Boolean(true)))?;
                 }
                 Opcode::OpFalse => {
-                    self.push_stack(Object::Boolean(false))?;
+                    self.push_stack(Rc::new(Object::Boolean(false)))?;
                 }
                 Opcode::OpEqual | Opcode::OpNotEqual | Opcode::OpGreaterThan => {
-                    self.exec_comparison(op)?;
+                    self.exec_comparison(&op)?;
                 }
                 Opcode::OpMinus => {
                     self.exec_minus_operator()?;
@@ -145,7 +151,7 @@ impl Vm {
                 Opcode::OpBang => {
                     self.exec_bang_operator()?;
                 }
-                Opcode::OpJump => match operands[..].try_into() {
+                Opcode::OpJump => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let jump_pos = u16::from_be_bytes(bytes) as usize;
                         self.current_frame_mut().ip = (jump_pos - 1) as i32;
@@ -154,9 +160,10 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpJumpCond => match operands[..].try_into() {
+                Opcode::OpJumpCond => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let jump_pos = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         let condition = self.pop_stack();
                         if !condition.is_truthy() {
@@ -167,9 +174,10 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpGetGlobal => match operands[..].try_into() {
+                Opcode::OpGetGlobal => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let global_index = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         self.push_stack(self.globals[global_index].clone())?;
                     }
@@ -177,9 +185,10 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpSetGlobal => match operands[..].try_into() {
+                Opcode::OpSetGlobal => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let global_index = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         self.globals[global_index] = self.pop_stack();
                     }
@@ -187,27 +196,29 @@ impl Vm {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpArray => match operands[..].try_into() {
+                Opcode::OpArray => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let num_elements = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         let new_sp = self.sp - num_elements;
                         let array = self.build_array(new_sp, self.sp);
                         self.sp = new_sp;
-                        self.push_stack(array)?;
+                        self.push_stack(Rc::new(array))?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
                     }
                 },
-                Opcode::OpHash => match operands[..].try_into() {
+                Opcode::OpHash => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let num_elements = u16::from_be_bytes(bytes) as usize;
+                        self.current_frame_mut().ip += 2;
 
                         let new_sp = self.sp - num_elements;
                         let hash = self.build_hash(new_sp, self.sp)?;
                         self.sp = new_sp;
-                        self.push_stack(hash)?;
+                        self.push_stack(Rc::new(hash))?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
@@ -219,16 +230,12 @@ impl Vm {
 
                     self.execute_index_expression(&identifier, &index)?;
                 }
-                Opcode::OpCall => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let num_args = u8::from_be_bytes(bytes) as usize;
+                Opcode::OpCall => {
+                    let num_args = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
 
-                        self.execute_call(num_args)?;
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
+                    self.execute_call(num_args)?;
+                }
                 Opcode::OpReturnValue => {
                     let return_value = self.pop_stack();
 
@@ -241,73 +248,52 @@ impl Vm {
                     let frame = self.pop_frame();
                     self.sp = frame.base_pointer - 1;
 
-                    self.push_stack(Object::Null)?;
+                    self.push_stack(Rc::new(Object::Null))?;
                 }
-                Opcode::OpGetLocal => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let local_index = u8::from_be_bytes(bytes) as usize;
+                Opcode::OpGetLocal => {
+                    let local_index = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
 
-                        let base_pointer = self.current_frame().base_pointer;
-                        self.push_stack(self.stack[base_pointer + local_index].clone())?;
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
-                Opcode::OpSetLocal => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let local_index = u8::from_be_bytes(bytes) as usize;
+                    let base_pointer = self.current_frame().base_pointer;
+                    self.push_stack(self.stack[base_pointer + local_index].clone())?;
+                }
+                Opcode::OpSetLocal => {
+                    let local_index = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
 
-                        let base_pointer = self.current_frame().base_pointer;
-                        self.stack[base_pointer + local_index] = self.pop_stack();
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
-                Opcode::OpGetBuiltin => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let builtin_index = u8::from_be_bytes(bytes) as usize;
+                    let base_pointer = self.current_frame().base_pointer;
+                    self.stack[base_pointer + local_index] = self.pop_stack();
+                }
+                Opcode::OpGetBuiltin => {
+                    let builtin_index = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
 
-                        let definition = BUILTINS[builtin_index].1;
+                    let definition = BUILTINS[builtin_index].1;
 
-                        self.push_stack(Object::BuiltinFn(definition))?;
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
-                Opcode::OpClosure => match operands[..2].try_into() {
+                    self.push_stack(Rc::new(Object::BuiltinFn(definition)))?;
+                }
+                Opcode::OpClosure => match instr[ip + 1..ip + 3].try_into() {
                     Ok(bytes) => {
                         let const_index = u16::from_be_bytes(bytes) as usize;
-                        match operands[2..].try_into() {
-                            Ok(bytes) => {
-                                let num_free = u8::from_be_bytes(bytes) as usize;
-                                self.push_closure(const_index, num_free)?;
-                            }
-                            Err(..) => {
-                                return Err("error in instruction".to_string());
-                            }
-                        }
-                    }
-                    Err(..) => {
-                        return Err("error in instruction".to_string());
-                    }
-                },
-                Opcode::OpGetFree => match operands[..].try_into() {
-                    Ok(bytes) => {
-                        let free_index = u8::from_be_bytes(bytes) as usize;
+                        let num_free = instr[ip + 3] as usize;
+                        self.current_frame_mut().ip += 3;
 
-                        let current_closure = &self.current_frame().closure;
-                        self.push_stack(current_closure.free_vars[free_index].clone())?;
+                        self.push_closure(const_index, num_free)?;
                     }
                     Err(..) => {
                         return Err("error in instruction".to_string());
                     }
                 },
+                Opcode::OpGetFree => {
+                    let free_index = instr[ip + 1] as usize;
+                    self.current_frame_mut().ip += 1;
+
+                    let current_closure = &self.current_frame().closure;
+                    self.push_stack(current_closure.free_vars[free_index].clone())?;
+                }
                 Opcode::OpCurrentClosure => {
                     let current_closure = self.current_frame().closure.clone();
-                    self.push_stack(Object::Closure(current_closure))?;
+                    self.push_stack(Rc::new(Object::Closure(current_closure)))?;
                 }
             }
         }
@@ -317,7 +303,7 @@ impl Vm {
     fn exec_binary_operation(&mut self, op: &Opcode) -> Result<(), VmError> {
         let rhs = self.pop_stack();
         let lhs = self.pop_stack();
-        match (&lhs, &rhs) {
+        match (lhs.as_ref(), rhs.as_ref()) {
             (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
                 self.exec_integer_binary_operation(op, *lhs_value, *rhs_value)
             }
@@ -347,7 +333,7 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push_stack(Object::Integer(r)),
+            Some(r) => self.push_stack(Rc::new(Object::Integer(r))),
             None => Err(format!("unknown INTEGER operator: {:?}", op)),
         }
     }
@@ -364,7 +350,7 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push_stack(Object::String(r)),
+            Some(r) => self.push_stack(Rc::new(Object::String(r))),
             None => Err(format!("unknown STRING operator: {:?}", op)),
         }
     }
@@ -372,7 +358,7 @@ impl Vm {
     fn exec_comparison(&mut self, op: &Opcode) -> Result<(), VmError> {
         let rhs = self.pop_stack();
         let lhs = self.pop_stack();
-        match (&lhs, &rhs) {
+        match (lhs.as_ref(), rhs.as_ref()) {
             (Object::Integer(lhs_value), Object::Integer(rhs_value)) => {
                 self.exec_integer_comparison(op, *lhs_value, *rhs_value)
             }
@@ -396,7 +382,7 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push_stack(Object::Boolean(r)),
+            Some(r) => self.push_stack(Rc::new(Object::Boolean(r))),
             None => Err(format!("unknown INTEGER operator: {:?}", op)),
         }
     }
@@ -414,15 +400,15 @@ impl Vm {
         };
 
         match result {
-            Some(r) => self.push_stack(Object::Boolean(r)),
+            Some(r) => self.push_stack(Rc::new(Object::Boolean(r))),
             None => Err(format!("unknown BOOLEAN operator: {:?}", op)),
         }
     }
 
     fn exec_minus_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop_stack();
-        match operand {
-            Object::Integer(value) => self.push_stack(Object::Integer(-value)),
+        match operand.as_ref() {
+            Object::Integer(value) => self.push_stack(Rc::new(Object::Integer(-value))),
             _ => Err(format!(
                 "unsupported type for negation: {}",
                 operand.get_type_str()
@@ -431,15 +417,18 @@ impl Vm {
     }
 
     fn exec_bang_operator(&mut self) -> Result<(), VmError> {
-        match self.pop_stack() {
-            Object::Boolean(value) => self.push_stack(Object::Boolean(!value)),
-            Object::Null => self.push_stack(Object::Boolean(true)),
-            _ => self.push_stack(Object::Boolean(false)),
+        match self.pop_stack().as_ref() {
+            Object::Boolean(value) => self.push_stack(Rc::new(Object::Boolean(!value))),
+            Object::Null => self.push_stack(Rc::new(Object::Boolean(true))),
+            _ => self.push_stack(Rc::new(Object::Boolean(false))),
         }
     }
 
     fn build_array(&self, start: usize, end: usize) -> Object {
-        let mut elements = vec![Object::Null; end - start];
+        let mut elements = {
+            let rc = Rc::new(Object::Null);
+            vec![rc; end - start]
+        };
         elements.clone_from_slice(&self.stack[start..end]);
 
         Object::Array(elements)
@@ -482,11 +471,11 @@ impl Vm {
 
     fn execute_array_index_expression(
         &mut self,
-        array: &[Object],
+        array: &[Rc<Object>],
         index: usize,
     ) -> Result<(), VmError> {
         if index >= array.len() {
-            return self.push_stack(Object::Null);
+            return self.push_stack(Rc::new(Object::Null));
         }
 
         self.push_stack(array[index].clone())
@@ -499,9 +488,9 @@ impl Vm {
     ) -> Result<(), VmError> {
         if let Some(hash_key) = index.get_hash_key() {
             if let Some(pair) = hash.get(&hash_key) {
-                self.push_stack(pair.clone().value)
+                self.push_stack(pair.value.clone())
             } else {
-                self.push_stack(Object::Null)
+                self.push_stack(Rc::new(Object::Null))
             }
         } else {
             Err(format!("unusable as hash key: {}", index.get_type_str()))
@@ -509,7 +498,7 @@ impl Vm {
     }
 
     fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
-        match &self.stack[self.sp - 1 - num_args] {
+        match self.stack[self.sp - 1 - num_args].as_ref() {
             Object::Closure(closure) => self.call_closure(closure.clone(), num_args),
             Object::BuiltinFn(builtin_fn) => self.call_builtin(*builtin_fn, num_args),
             _ => Err("calling non-function".to_string()),
@@ -534,17 +523,17 @@ impl Vm {
     fn call_builtin(&mut self, builtin_fn: BuiltinFn, num_args: usize) -> Result<(), VmError> {
         let args = &self.stack[self.sp - num_args..self.sp];
 
-        let result = builtin_fn(args.to_vec());
+        let result = builtin_fn(args);
         self.sp -= num_args + 1;
 
         self.push_stack(result)
     }
 
-    pub fn last_popped(&self) -> Object {
+    pub fn last_popped(&self) -> Rc<Object> {
         self.stack[self.sp].clone()
     }
 
-    fn push_stack(&mut self, obj: Object) -> Result<(), VmError> {
+    fn push_stack(&mut self, obj: Rc<Object>) -> Result<(), VmError> {
         if self.sp > STACK_SIZE {
             return Err("stack overflow".to_string());
         }
@@ -554,7 +543,7 @@ impl Vm {
         Ok(())
     }
 
-    fn pop_stack(&mut self) -> Object {
+    fn pop_stack(&mut self) -> Rc<Object> {
         let obj = self.stack[self.sp - 1].clone();
         self.sp -= 1;
         obj
@@ -580,9 +569,12 @@ impl Vm {
 
     fn push_closure(&mut self, const_index: usize, num_free: usize) -> Result<(), VmError> {
         let constant = &self.constants[const_index];
-        match constant {
+        match constant.as_ref() {
             Object::CompiledFn(compiled_fn) => {
-                let mut free_vars = vec![Object::Null; num_free];
+                let mut free_vars = {
+                    let rc = Rc::new(Object::Null);
+                    vec![rc; num_free]
+                };
                 free_vars.clone_from_slice(&self.stack[self.sp - num_free..self.sp]);
                 self.sp -= num_free;
 
@@ -590,7 +582,7 @@ impl Vm {
                     function: Rc::new(compiled_fn.clone()),
                     free_vars,
                 });
-                self.push_stack(closure)
+                self.push_stack(Rc::new(closure))
             }
             _ => Err(format!("not a function: {}", constant)),
         }
