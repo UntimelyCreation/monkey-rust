@@ -71,7 +71,7 @@ fn eval_statement(
     match stmt {
         Statement::Let(stmt) => {
             let val = eval_expression(&stmt.value, env.clone())?;
-            env.borrow_mut().set(stmt.identifier.name.clone(), val);
+            env.borrow_mut().set(stmt.identifier.name.to_string(), val);
             Ok(Rc::new(Object::Null))
         }
         Statement::Return(stmt) => {

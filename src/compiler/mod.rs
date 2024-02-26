@@ -142,7 +142,7 @@ impl Compiler {
                 Ok(())
             }
             Expression::String(expr) => {
-                let string_obj = Object::String(expr.value.clone());
+                let string_obj = Object::String(expr.value.to_string());
                 let string_pos = self.add_constant(string_obj) as i32;
                 self.emit(Opcode::OpConstant, &[string_pos]);
                 Ok(())
@@ -267,7 +267,7 @@ impl Compiler {
                     self.emit(Opcode::OpReturn, &[]);
                 }
 
-                let free_symbols = self.symbol_table.free_symbols.clone();
+                let free_symbols = self.symbol_table.free_symbols.to_vec();
                 let num_locals = self.symbol_table.num_definitions;
                 let instrs = self.leave_scope();
 
@@ -358,7 +358,7 @@ impl Compiler {
         let previous = self.scopes[self.scope_index].prev_instruction.clone();
         let last = self.scopes[self.scope_index].last_instruction.clone();
 
-        let old = self.current_instructions().stream.clone();
+        let old = self.current_instructions().stream.to_vec();
         let new = old[..last.position].to_vec();
 
         self.scopes[self.scope_index].instructions.stream = new;

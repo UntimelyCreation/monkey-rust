@@ -221,7 +221,7 @@ pub fn make(op: Opcode, operands: &[i32]) -> Vec<u8> {
     let instruction_len = definition.operand_widths.iter().sum::<usize>() + 1;
 
     let mut instruction = vec![0; instruction_len];
-    instruction[0] = op as u8;
+    instruction[0] = op.clone() as u8;
 
     let mut offset = 1;
     for (i, o) in operands.iter().enumerate() {
